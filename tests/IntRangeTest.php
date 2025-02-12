@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Ciloe\Ranges\Tests;
 
+use Ciloe\Ranges\Exception\CantGenerateSeriesBecauseTheArrayIsTooLarge;
 use Ciloe\Ranges\Exception\InvalidBoundException;
 use Ciloe\Ranges\Exception\InvalidInfinitBoundException;
+use Ciloe\Ranges\Exception\InvalidStepToGenerateSeriesException;
 use Ciloe\Ranges\IntRange;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
@@ -477,5 +479,39 @@ class IntRangeTest extends TestCase
     {
         $range = new IntRange(5, 10, '[', ']', 6);
         $this->assertEquals(1, $range->length());
+    }
+
+    public function testGenerateSeriesWithValidBoundsAndStep()
+    {
+        $range = new IntRange(1, 10, '[', ']', 2);
+        $this->assertEquals([1, 3, 5, 7, 9], $range->generateSeries());
+    }
+
+    public function testGenerateSeriesWithNullLowerBound()
+    {
+        $this->expectException(CantGenerateSeriesBecauseTheArrayIsTooLarge::class);
+        $range = new IntRange(null, 5, '(', ']', 1);
+        $range->generateSeries();
+    }
+
+    public function testGenerateSeriesWithNullUpperBound()
+    {
+        $this->expectException(CantGenerateSeriesBecauseTheArrayIsTooLarge::class);
+        $range = new IntRange(1, null, '[', ')', 1);
+        $range->generateSeries();
+    }
+
+    public function testGenerateSeriesWithNullBounds()
+    {
+        $this->expectException(CantGenerateSeriesBecauseTheArrayIsTooLarge::class);
+        $range = new IntRange(null, null, '(', ')', 1);
+        $range->generateSeries();
+    }
+
+    public function testGenerateSeriesWithStepGreaterThanRange()
+    {
+        $this->expectException(InvalidStepToGenerateSeriesException::class);
+        $range = new IntRange(1, 5, '[', ']', 10);
+        $range->generateSeries();
     }
 }

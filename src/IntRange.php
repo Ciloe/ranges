@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Ciloe\Ranges;
 
+use Ciloe\Ranges\Exception\CantGenerateSeriesBecauseTheArrayIsTooLarge;
 use Ciloe\Ranges\Exception\InvalidBoundException;
 use Ciloe\Ranges\Exception\InvalidInfinitBoundException;
+use Ciloe\Ranges\Exception\InvalidStepToGenerateSeriesException;
+use Exception;
 use InvalidArgumentException;
 
 class IntRange
@@ -121,5 +124,28 @@ class IntRange
         }
 
         return new self($lower === PHP_INT_MIN ? null : $lower, $upper === PHP_INT_MAX ? null : $upper, '[', ']');
+    }
+
+    /**
+     * @return int[] 
+     */
+    public function generateSeries(): array
+    {
+        $lower = $this->getLowerBoundValue();
+        $upper = $this->getUpperBoundValue();
+
+        if ($lower === null || $upper === null) {
+            throw new CantGenerateSeriesBecauseTheArrayIsTooLarge();
+        }
+
+        if (($upper - $lower) < $this->step) {
+            throw new InvalidStepToGenerateSeriesException();
+        }
+
+        try {
+            return range($lower, $upper, $this->step);
+        } catch (Exception $e) {
+            throw new CantGenerateSeriesBecauseTheArrayIsTooLarge($e);
+        }
     }
 }
