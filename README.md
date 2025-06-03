@@ -42,6 +42,6 @@ $range->generateSeries(); // [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 ## Notes
 
 - Ranges can have infinite bounds (null)
-- Bounds can be inclusive ([, ]) or exclusive ((, ))
+- Bounds can be inclusive (`[`, `]`) or exclusive (`(`, `)`)
 - The step only affects series generation, not other operations
 - Operations between ranges (union, intersection) require the same step
