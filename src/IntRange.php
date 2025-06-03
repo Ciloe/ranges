@@ -161,4 +161,104 @@ class IntRange
             throw new CantGenerateSeriesBecauseTheArrayIsTooLarge($e);
         }
     }
+
+    public function __toString(): string
+    {
+        $lowerValue = $this->lower === null ? '' : $this->lower;
+        $upperValue = $this->upper === null ? '' : $this->upper;
+
+        return $this->lowerBound . $lowerValue . ',' . $upperValue . $this->upperBound;
+    }
+
+    public function equals(IntRange $range): bool
+    {
+        return $this->getLowerBoundValue() === $range->getLowerBoundValue() &&
+               $this->getUpperBoundValue() === $range->getUpperBoundValue() &&
+               $this->step === $range->step;
+    }
+
+    /**
+     * @return array<IntRange>
+     */
+    public function split(int $point): array
+    {
+        // If the point is outside the range, return the original range
+        if (!$this->contains($point)) {
+            return [$this];
+        }
+
+        // Create the two new ranges
+        $leftRange = new self(
+            $this->lower,
+            $point,
+            $this->lowerBound,
+            ')',
+            $this->step
+        );
+
+        $rightRange = new self(
+            $point,
+            $this->upper,
+            '[',
+            $this->upperBound,
+            $this->step
+        );
+
+        return [$leftRange, $rightRange];
+    }
+
+    public function clone(): self
+    {
+        return new self(
+            $this->lower,
+            $this->upper,
+            $this->lowerBound,
+            $this->upperBound,
+            $this->step
+        );
+    }
+
+    public function shift(int $offset): self
+    {
+        $newLower = $this->lower === null ? null : $this->lower + $offset;
+        $newUpper = $this->upper === null ? null : $this->upper + $offset;
+
+        return new self(
+            $newLower,
+            $newUpper,
+            $this->lowerBound,
+            $this->upperBound,
+            $this->step
+        );
+    }
+
+    public function scale(int $factor): self
+    {
+        if ($factor === 0) {
+            throw new InvalidArgumentException('Scale factor cannot be zero');
+        }
+
+        $newLower = $this->lower === null ? null : $this->lower * $factor;
+        $newUpper = $this->upper === null ? null : $this->upper * $factor;
+
+        $lowerBound = $this->lowerBound;
+        $upperBound = $this->upperBound;
+
+        if ($factor < 0) {
+            $tempValue = $newLower;
+            $newLower = $newUpper;
+            $newUpper = $tempValue;
+
+            $lowerBound = $this->upperBound === ']' ? '[' : '(';
+            $upperBound = $this->lowerBound === '[' ? ']' : ')';
+        }
+
+        return new self(
+            $newLower,
+            $newUpper,
+            $lowerBound,
+            $upperBound,
+            $this->step * abs($factor)
+        );
+    }
 }

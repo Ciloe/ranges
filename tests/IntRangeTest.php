@@ -1331,4 +1331,305 @@ class IntRangeTest extends TestCase
         $range = new IntRange(-10, 10, '[', ']', 4);
         $this->assertEquals([-10, -6, -2, 2, 6, 10], $range->generateSeries());
     }
+
+    public function testToString()
+    {
+        // Test with regular bounds
+        $range = new IntRange(1, 10, '[', ']');
+        $this->assertEquals('[1,10]', (string)$range);
+
+        // Test with exclusive bounds
+        $range = new IntRange(1, 10, '(', ')');
+        $this->assertEquals('(1,10)', (string)$range);
+
+        // Test with mixed bounds
+        $range = new IntRange(1, 10, '[', ')');
+        $this->assertEquals('[1,10)', (string)$range);
+
+        $range = new IntRange(1, 10, '(', ']');
+        $this->assertEquals('(1,10]', (string)$range);
+
+        // Test with null lower bound
+        $range = new IntRange(null, 10, '(', ']');
+        $this->assertEquals('(,10]', (string)$range);
+
+        // Test with null upper bound
+        $range = new IntRange(1, null, '[', ')');
+        $this->assertEquals('[1,)', (string)$range);
+
+        // Test with both null bounds
+        $range = new IntRange(null, null, '(', ')');
+        $this->assertEquals('(,)', (string)$range);
+
+        // Test with negative values
+        $range = new IntRange(-10, -1, '[', ']');
+        $this->assertEquals('[-10,-1]', (string)$range);
+
+        // Test with step value (should not affect string representation)
+        $range = new IntRange(1, 10, '[', ']', 2);
+        $this->assertEquals('[1,10]', (string)$range);
+    }
+
+    public function testEquals()
+    {
+        // Test with identical ranges
+        $range1 = new IntRange(1, 10, '[', ']');
+        $range2 = new IntRange(1, 10, '[', ']');
+        $this->assertTrue($range1->equals($range2));
+
+        // Test with different lower bounds
+        $range1 = new IntRange(1, 10, '[', ']');
+        $range2 = new IntRange(2, 10, '[', ']');
+        $this->assertFalse($range1->equals($range2));
+
+        // Test with different lower bounds but different includes
+        $range1 = new IntRange(1, 10, '(', ']');
+        $range2 = new IntRange(2, 11, '[', ')');
+        $this->assertTrue($range1->equals($range2));
+
+        // Test with different upper bounds
+        $range1 = new IntRange(1, 10, '[', ']');
+        $range2 = new IntRange(1, 11, '[', ']');
+        $this->assertFalse($range1->equals($range2));
+
+        // Test with different lower bound types
+        $range1 = new IntRange(1, 10, '[', ']');
+        $range2 = new IntRange(1, 10, '(', ']');
+        $this->assertFalse($range1->equals($range2));
+
+        // Test with different upper bound types
+        $range1 = new IntRange(1, 10, '[', ']');
+        $range2 = new IntRange(1, 10, '[', ')');
+        $this->assertFalse($range1->equals($range2));
+
+        // Test with different step values
+        $range1 = new IntRange(1, 10, '[', ']', 1);
+        $range2 = new IntRange(1, 10, '[', ']', 2);
+        $this->assertFalse($range1->equals($range2));
+
+        // Test with null bounds
+        $range1 = new IntRange(null, 10, '(', ']');
+        $range2 = new IntRange(null, 10, '(', ']');
+        $this->assertTrue($range1->equals($range2));
+
+        $range1 = new IntRange(1, null, '[', ')');
+        $range2 = new IntRange(1, null, '[', ')');
+        $this->assertTrue($range1->equals($range2));
+
+        $range1 = new IntRange(null, null, '(', ')');
+        $range2 = new IntRange(null, null, '(', ')');
+        $this->assertTrue($range1->equals($range2));
+
+        // Test with different null bounds
+        $range1 = new IntRange(null, 10, '(', ']');
+        $range2 = new IntRange(1, 10, '[', ']');
+        $this->assertFalse($range1->equals($range2));
+    }
+
+    public function testSplit()
+    {
+        // Test splitting in the middle of the range
+        $range = new IntRange(1, 10, '[', ']');
+        $result = $range->split(5);
+        $this->assertCount(2, $result);
+        $this->assertEquals('[1,5)', (string)$result[0]);
+        $this->assertEquals('[5,10]', (string)$result[1]);
+
+        // Test splitting at the lower bound
+        $range = new IntRange(1, 10, '[', ']');
+        $result = $range->split(1);
+        $this->assertCount(2, $result);
+        $this->assertEquals('[1,1)', (string)$result[0]);
+        $this->assertEquals('[1,10]', (string)$result[1]);
+
+        // Test splitting at the upper bound
+        $range = new IntRange(1, 10, '[', ']');
+        $result = $range->split(10);
+        $this->assertCount(2, $result);
+        $this->assertEquals('[1,10)', (string)$result[0]);
+        $this->assertEquals('[10,10]', (string)$result[1]);
+
+        // Test splitting outside the range (below)
+        $range = new IntRange(1, 10, '[', ']');
+        $result = $range->split(0);
+        $this->assertCount(1, $result);
+        $this->assertEquals('[1,10]', (string)$result[0]);
+
+        // Test splitting outside the range (above)
+        $range = new IntRange(1, 10, '[', ']');
+        $result = $range->split(11);
+        $this->assertCount(1, $result);
+        $this->assertEquals('[1,10]', (string)$result[0]);
+
+        // Test splitting with exclusive bounds
+        $range = new IntRange(1, 10, '(', ')');
+        $result = $range->split(5);
+        $this->assertCount(2, $result);
+        $this->assertEquals('(1,5)', (string)$result[0]);
+        $this->assertEquals('[5,10)', (string)$result[1]);
+
+        // Test splitting with mixed bounds
+        $range = new IntRange(1, 10, '[', ')');
+        $result = $range->split(5);
+        $this->assertCount(2, $result);
+        $this->assertEquals('[1,5)', (string)$result[0]);
+        $this->assertEquals('[5,10)', (string)$result[1]);
+
+        // Test splitting with null bounds
+        $range = new IntRange(null, 10, '(', ']');
+        $result = $range->split(0);
+        $this->assertCount(2, $result);
+        $this->assertEquals('(,0)', (string)$result[0]);
+        $this->assertEquals('[0,10]', (string)$result[1]);
+
+        $range = new IntRange(1, null, '[', ')');
+        $result = $range->split(5);
+        $this->assertCount(2, $result);
+        $this->assertEquals('[1,5)', (string)$result[0]);
+        $this->assertEquals('[5,)', (string)$result[1]);
+    }
+
+    public function testClone()
+    {
+        // Test cloning a regular range
+        $range = new IntRange(1, 10, '[', ']');
+        $clone = $range->clone();
+        $this->assertTrue($range->equals($clone));
+        $this->assertNotSame($range, $clone);
+
+        // Test cloning a range with null bounds
+        $range = new IntRange(null, 10, '(', ']');
+        $clone = $range->clone();
+        $this->assertTrue($range->equals($clone));
+        $this->assertNotSame($range, $clone);
+
+        $range = new IntRange(1, null, '[', ')');
+        $clone = $range->clone();
+        $this->assertTrue($range->equals($clone));
+        $this->assertNotSame($range, $clone);
+
+        $range = new IntRange(null, null, '(', ')');
+        $clone = $range->clone();
+        $this->assertTrue($range->equals($clone));
+        $this->assertNotSame($range, $clone);
+
+        // Test cloning a range with a step value
+        $range = new IntRange(1, 10, '[', ']', 2);
+        $clone = $range->clone();
+        $this->assertTrue($range->equals($clone));
+        $this->assertNotSame($range, $clone);
+        $this->assertEquals(2, $clone->step);
+    }
+
+    public function testShift()
+    {
+        // Test shifting a regular range
+        $range = new IntRange(1, 10, '[', ']');
+        $shifted = $range->shift(5);
+        $this->assertEquals('[6,15]', (string)$shifted);
+
+        // Test shifting a range with negative offset
+        $range = new IntRange(1, 10, '[', ']');
+        $shifted = $range->shift(-5);
+        $this->assertEquals('[-4,5]', (string)$shifted);
+
+        // Test shifting a range with null lower bound
+        $range = new IntRange(null, 10, '(', ']');
+        $shifted = $range->shift(5);
+        $this->assertEquals('(,15]', (string)$shifted);
+
+        // Test shifting a range with null upper bound
+        $range = new IntRange(1, null, '[', ')');
+        $shifted = $range->shift(5);
+        $this->assertEquals('[6,)', (string)$shifted);
+
+        // Test shifting a range with both null bounds
+        $range = new IntRange(null, null, '(', ')');
+        $shifted = $range->shift(5);
+        $this->assertEquals('(,)', (string)$shifted);
+
+        // Test that original range is not modified
+        $range = new IntRange(1, 10, '[', ']');
+        $shifted = $range->shift(5);
+        $this->assertEquals('[1,10]', (string)$range);
+
+        // Test that bound types are preserved
+        $range = new IntRange(1, 10, '(', ')');
+        $shifted = $range->shift(5);
+        $this->assertEquals('(6,15)', (string)$shifted);
+
+        // Test that step is preserved
+        $range = new IntRange(1, 10, '[', ']', 2);
+        $shifted = $range->shift(5);
+        $this->assertEquals(2, $shifted->step);
+    }
+
+    public function testScale()
+    {
+        // Test scaling a regular range with positive factor
+        $range = new IntRange(1, 10, '[', ']');
+        $scaled = $range->scale(2);
+        $this->assertEquals('[2,20]', (string)$scaled);
+
+        // Test scaling a range with negative factor
+        $range = new IntRange(1, 10, '[', ']');
+        $scaled = $range->scale(-2);
+        $this->assertEquals('[-20,-2]', (string)$scaled);
+
+        // Test scaling a range with null lower bound
+        $range = new IntRange(null, 10, '(', ']');
+        $scaled = $range->scale(2);
+        $this->assertEquals('(,20]', (string)$scaled);
+
+        // Test scaling a range with null upper bound
+        $range = new IntRange(1, null, '[', ')');
+        $scaled = $range->scale(2);
+        $this->assertEquals('[2,)', (string)$scaled);
+
+        // Test scaling a range with both null bounds
+        $range = new IntRange(null, null, '(', ')');
+        $scaled = $range->scale(2);
+        $this->assertEquals('(,)', (string)$scaled);
+
+        // Test that original range is not modified
+        $range = new IntRange(1, 10, '[', ']');
+        $scaled = $range->scale(2);
+        $this->assertEquals('[1,10]', (string)$range);
+
+        // Test that bound types are preserved with positive factor
+        $range = new IntRange(1, 10, '(', ')');
+        $scaled = $range->scale(2);
+        $this->assertEquals('(2,20)', (string)$scaled);
+
+        // Test that bound types are swapped with negative factor
+        $range = new IntRange(1, 10, '(', ')');
+        $scaled = $range->scale(-2);
+        $this->assertEquals('(-20,-2)', (string)$scaled);
+
+        $range = new IntRange(1, 10, '[', ']');
+        $scaled = $range->scale(-2);
+        $this->assertEquals('[-20,-2]', (string)$scaled);
+
+        $range = new IntRange(1, 10, '[', ')');
+        $scaled = $range->scale(-2);
+        $this->assertEquals('(-20,-2]', (string)$scaled);
+
+        $range = new IntRange(1, 10, '(', ']');
+        $scaled = $range->scale(-2);
+        $this->assertEquals('[-20,-2)', (string)$scaled);
+
+        // Test that step is scaled
+        $range = new IntRange(1, 10, '[', ']', 2);
+        $scaled = $range->scale(3);
+        $this->assertEquals(6, $scaled->step);
+
+        $range = new IntRange(1, 10, '[', ']', 2);
+        $scaled = $range->scale(-3);
+        $this->assertEquals(6, $scaled->step);
+
+        // Test with zero factor (should throw exception)
+        $range = new IntRange(1, 10, '[', ']');
+        $this->expectException(InvalidArgumentException::class);
+        $range->scale(0);
+    }
 }
