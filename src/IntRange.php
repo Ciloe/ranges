@@ -59,7 +59,9 @@ class IntRange
 
     public function isEmpty(): bool
     {
-        return $this->lower === $this->upper && ($this->lowerBound === '(' || $this->upperBound === ')') && $this->lower !== null;
+        return $this->lower === $this->upper &&
+            ($this->lowerBound === '(' || $this->upperBound === ')') &&
+            $this->lower !== null;
     }
 
     public function isBoundsValid(): bool
@@ -123,7 +125,9 @@ class IntRange
         }
 
         $lower = min($this->getLowerBoundValue(), $range->getLowerBoundValue());
-        $upper = $this->getUpperBoundValue() === null || $range->getUpperBoundValue() === null ? null : max($this->getUpperBoundValue(), $range->getUpperBoundValue());
+        $upper = ($this->getUpperBoundValue() === null || $range->getUpperBoundValue() === null) ?
+            null :
+            max($this->getUpperBoundValue(), $range->getUpperBoundValue());
 
         return new self($lower, $upper, '[', ']');
     }
@@ -137,7 +141,7 @@ class IntRange
         $lower = max($this->getLowerBoundValue() ?? PHP_INT_MIN, $range->getLowerBoundValue() ?? PHP_INT_MIN);
         $upper = min($this->getUpperBoundValue() ?? PHP_INT_MAX, $range->getUpperBoundValue() ?? PHP_INT_MAX);
 
-        if (($lower ?? PHP_INT_MIN) > ($upper ?? PHP_INT_MAX)) {
+        if ($lower > $upper) {
             return null;
         }
 
