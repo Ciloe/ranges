@@ -16,7 +16,7 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Ciloe\\Ranges\\Tests\\": "tests/"
+            "Tests\\Ciloe\\Ranges\\": "tests/"
         }
     },
     "config": {

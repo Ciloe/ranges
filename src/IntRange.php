@@ -6,7 +6,7 @@ namespace Ciloe\Ranges;
 
 use Ciloe\Ranges\Exception\CantGenerateSeriesBecauseTheArrayIsTooLarge;
 use Ciloe\Ranges\Exception\InvalidBoundException;
-use Ciloe\Ranges\Exception\InvalidInfinitBoundException;
+use Ciloe\Ranges\Exception\InvalidInfiniteBoundException;
 use Ciloe\Ranges\Exception\InvalidStepToGenerateSeriesException;
 use Exception;
 use InvalidArgumentException;
@@ -24,7 +24,7 @@ class IntRange
     public static function fromString(string $range): self
     {
         // Validate the string format
-        if (!preg_match('/^(\[|\()(\d+|null)?,(\d+|null)?(\]|\))$/', $range, $matches)) {
+        if (!preg_match('/^(\[|\()(-?\d+|null)?,(-?\d+|null)?(\]|\))$/', $range, $matches)) {
             throw new InvalidArgumentException('Invalid range format');
         }
 
@@ -35,7 +35,7 @@ class IntRange
         $upperBound = $matches[4];
 
         if (($lower === null && $lowerBound === '[') || ($upper === null && $upperBound === ']')) {
-            throw new InvalidInfinitBoundException();
+            throw new InvalidInfiniteBoundException();
         }
 
         $range = new self($lower, $upper, $lowerBound, $upperBound);
@@ -49,7 +49,7 @@ class IntRange
 
     public function isEmpty(): bool
     {
-        return $this->lower === $this->upper && ($this->lowerBound === '(' || $this->upperBound === ')');
+        return $this->lower === $this->upper && ($this->lowerBound === '(' || $this->upperBound === ')') && $this->lower !== null;
     }
 
     public function isBoundsValid(): bool
@@ -59,12 +59,12 @@ class IntRange
 
     public function getLowerBoundValue(): ?int
     {
-        return $this->lower === null ? null : ($this->lowerBound === '[' ? $this->lower : $this->lower + $this->step);
+        return $this->lower === null ? null : ($this->lowerBound === '[' ? $this->lower : $this->lower + 1);
     }
 
     public function getUpperBoundValue(): ?int
     {
-        return $this->upper === null ? null : ($this->upperBound === ']' ? $this->upper : $this->upper - $this->step);
+        return $this->upper === null ? null : ($this->upperBound === ']' ? $this->upper : $this->upper - 1);
     }
 
     public function contains(int $int): bool
@@ -77,6 +77,10 @@ class IntRange
 
     public function overlap(IntRange $range): bool
     {
+        if ($this->isEmpty() || $range->isEmpty()) {
+            return false;
+        }
+
         // [a1:a2]
         $a1 = $this->getLowerBoundValue() ?? PHP_INT_MIN;
         $a2 = $this->getUpperBoundValue() ?? PHP_INT_MAX;
@@ -84,7 +88,7 @@ class IntRange
         $b1 = $range->getLowerBoundValue() ?? PHP_INT_MIN;
         $b2 = $range->getUpperBoundValue() ?? PHP_INT_MAX;
 
-        return max($a2, $b2) - min($a1, $b1) <= ($a2 - $a1) + ($b2 - $b1);
+        return $a2 >= $b1 && $b2 >= $a1;
     }
 
     public function length(): ?int
@@ -95,7 +99,12 @@ class IntRange
             return null;
         }
 
-        return (int)ceil(($upper - $lower) / $this->step);
+        $diff = ($upper - $lower);
+        $includeUpper = $diff % $this->step === 0;
+
+        $length = (int)ceil(($upper - $lower) / $this->step) + ($includeUpper ? 1 : 0);
+
+        return max($length, 0);
     }
 
     public function union(IntRange $range): ?self
@@ -105,7 +114,7 @@ class IntRange
         }
 
         $lower = min($this->getLowerBoundValue(), $range->getLowerBoundValue());
-        $upper = max($this->getUpperBoundValue(), $range->getUpperBoundValue());
+        $upper = $this->getUpperBoundValue() === null || $range->getUpperBoundValue() === null ? null : max($this->getUpperBoundValue(), $range->getUpperBoundValue());
 
         return new self($lower, $upper, '[', ']');
     }
@@ -131,6 +140,10 @@ class IntRange
      */
     public function generateSeries(): array
     {
+        if ($this->isEmpty()) {
+            return [];
+        }
+
         $lower = $this->getLowerBoundValue();
         $upper = $this->getUpperBoundValue();
 
@@ -138,7 +151,7 @@ class IntRange
             throw new CantGenerateSeriesBecauseTheArrayIsTooLarge();
         }
 
-        if (($upper - $lower) < $this->step) {
+        if ($upper !== $lower && ($upper - $lower) < $this->step) {
             throw new InvalidStepToGenerateSeriesException();
         }
 

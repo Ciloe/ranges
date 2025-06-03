@@ -10,6 +10,6 @@ final class InvalidBoundException extends Exception
 {
     public function __construct() 
     {
-        parent::__construct('The lower bound can\'t gretter than the upper');
+        parent::__construct('The lower bound can\'t be greater than the upper bound');
     }
 }
