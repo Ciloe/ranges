@@ -8,7 +8,7 @@ use Exception;
 
 final class InvalidInfiniteBoundException extends Exception
 {
-    public function __construct() 
+    public function __construct()
     {
         parent::__construct('The infinite bound can\'t be included');
     }

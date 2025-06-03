@@ -19,17 +19,29 @@ class IntRange
         readonly public string $lowerBound = '(',
         readonly public string $upperBound = ')',
         public int $step = 1,
-    ) {}
+    ) {
+        if ($step <= 0) {
+            throw new InvalidArgumentException('Step must be positive');
+        }
+    }
+
+    public function __toString(): string
+    {
+        $lowerValue = $this->lower === null ? '' : $this->lower;
+        $upperValue = $this->upper === null ? '' : $this->upper;
+
+        return $this->lowerBound . $lowerValue . ',' . $upperValue . $this->upperBound;
+    }
 
     public static function fromString(string $range): self
     {
-        if (!preg_match('/^(\[|\()(-?\d+|null)?,(-?\d+|null)?(\]|\))$/', $range, $matches)) {
+        if (! preg_match('/^(\[|\()(-?\d+|null)?,(-?\d+|null)?(\]|\))$/', $range, $matches)) {
             throw new InvalidArgumentException('Invalid range format');
         }
 
         $lowerBound = $matches[1];
-        $lower = $matches[2] === 'null' || $matches[2] === '' ? null : (int)$matches[2];
-        $upper = $matches[3] === 'null' || $matches[3] === '' ? null : (int)$matches[3];
+        $lower = $matches[2] === 'null' || $matches[2] === '' ? null : (int) $matches[2];
+        $upper = $matches[3] === 'null' || $matches[3] === '' ? null : (int) $matches[3];
         $upperBound = $matches[4];
 
         if (($lower === null && $lowerBound === '[') || ($upper === null && $upperBound === ']')) {
@@ -38,7 +50,7 @@ class IntRange
 
         $range = new self($lower, $upper, $lowerBound, $upperBound);
 
-        if (!$range->isBoundsValid()) {
+        if (! $range->isBoundsValid()) {
             throw new InvalidBoundException();
         }
 
@@ -67,13 +79,13 @@ class IntRange
 
     public function contains(int $int): bool
     {
-        $lower = $this->getLowerBoundValue() ?? (int)PHP_INT_MIN;
-        $upper = $this->getUpperBoundValue() ?? (int)PHP_INT_MAX;
+        $lower = $this->getLowerBoundValue() ?? (int) PHP_INT_MIN;
+        $upper = $this->getUpperBoundValue() ?? (int) PHP_INT_MAX;
 
         return $lower <= $int && $int <= $upper;
     }
 
-    public function overlap(IntRange $range): bool
+    public function overlap(self $range): bool
     {
         if ($this->isEmpty() || $range->isEmpty()) {
             return false;
@@ -91,6 +103,7 @@ class IntRange
     {
         $lower = $this->getLowerBoundValue();
         $upper = $this->getUpperBoundValue();
+
         if ($lower === null || $upper === null) {
             return null;
         }
@@ -98,12 +111,12 @@ class IntRange
         $diff = ($upper - $lower);
         $includeUpper = $diff % $this->step === 0;
 
-        $length = (int)ceil(($upper - $lower) / $this->step) + ($includeUpper ? 1 : 0);
+        $length = (int) ceil(($upper - $lower) / $this->step) + ($includeUpper ? 1 : 0);
 
         return max($length, 0);
     }
 
-    public function union(IntRange $range): ?self
+    public function union(self $range): ?self
     {
         if ($this->step !== $range->step) {
             return null;
@@ -115,7 +128,7 @@ class IntRange
         return new self($lower, $upper, '[', ']');
     }
 
-    public function intersection(IntRange $range): ?self
+    public function intersection(self $range): ?self
     {
         if ($this->step !== $range->step) {
             return null;
@@ -132,7 +145,7 @@ class IntRange
     }
 
     /**
-     * @return int[] 
+     * @return int[]
      */
     public function generateSeries(): array
     {
@@ -158,15 +171,7 @@ class IntRange
         }
     }
 
-    public function __toString(): string
-    {
-        $lowerValue = $this->lower === null ? '' : $this->lower;
-        $upperValue = $this->upper === null ? '' : $this->upper;
-
-        return $this->lowerBound . $lowerValue . ',' . $upperValue . $this->upperBound;
-    }
-
-    public function equals(IntRange $range): bool
+    public function equals(self $range): bool
     {
         return $this->getLowerBoundValue() === $range->getLowerBoundValue() &&
                $this->getUpperBoundValue() === $range->getUpperBoundValue() &&
@@ -178,7 +183,7 @@ class IntRange
      */
     public function split(int $point): array
     {
-        if (!$this->contains($point)) {
+        if (! $this->contains($point)) {
             return [$this];
         }
 

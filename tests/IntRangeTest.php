@@ -175,7 +175,6 @@ class IntRangeTest extends TestCase
             $this->assertTrue(true);
         }
 
-
         try {
             IntRange::fromString('(abc,xyz)');
             $this->fail('Expected InvalidArgumentException was not thrown');
@@ -1264,31 +1263,31 @@ class IntRangeTest extends TestCase
     public function testToString()
     {
         $range = new IntRange(1, 10, '[', ']');
-        $this->assertEquals('[1,10]', (string)$range);
+        $this->assertEquals('[1,10]', (string) $range);
 
         $range = new IntRange(1, 10, '(', ')');
-        $this->assertEquals('(1,10)', (string)$range);
+        $this->assertEquals('(1,10)', (string) $range);
 
         $range = new IntRange(1, 10, '[', ')');
-        $this->assertEquals('[1,10)', (string)$range);
+        $this->assertEquals('[1,10)', (string) $range);
 
         $range = new IntRange(1, 10, '(', ']');
-        $this->assertEquals('(1,10]', (string)$range);
+        $this->assertEquals('(1,10]', (string) $range);
 
         $range = new IntRange(null, 10, '(', ']');
-        $this->assertEquals('(,10]', (string)$range);
+        $this->assertEquals('(,10]', (string) $range);
 
         $range = new IntRange(1, null, '[', ')');
-        $this->assertEquals('[1,)', (string)$range);
+        $this->assertEquals('[1,)', (string) $range);
 
         $range = new IntRange(null, null, '(', ')');
-        $this->assertEquals('(,)', (string)$range);
+        $this->assertEquals('(,)', (string) $range);
 
         $range = new IntRange(-10, -1, '[', ']');
-        $this->assertEquals('[-10,-1]', (string)$range);
+        $this->assertEquals('[-10,-1]', (string) $range);
 
         $range = new IntRange(1, 10, '[', ']', 2);
-        $this->assertEquals('[1,10]', (string)$range);
+        $this->assertEquals('[1,10]', (string) $range);
     }
 
     public function testEquals()
@@ -1343,54 +1342,54 @@ class IntRangeTest extends TestCase
         $range = new IntRange(1, 10, '[', ']');
         $result = $range->split(5);
         $this->assertCount(2, $result);
-        $this->assertEquals('[1,5)', (string)$result[0]);
-        $this->assertEquals('[5,10]', (string)$result[1]);
+        $this->assertEquals('[1,5)', (string) $result[0]);
+        $this->assertEquals('[5,10]', (string) $result[1]);
 
         $range = new IntRange(1, 10, '[', ']');
         $result = $range->split(1);
         $this->assertCount(2, $result);
-        $this->assertEquals('[1,1)', (string)$result[0]);
-        $this->assertEquals('[1,10]', (string)$result[1]);
+        $this->assertEquals('[1,1)', (string) $result[0]);
+        $this->assertEquals('[1,10]', (string) $result[1]);
 
         $range = new IntRange(1, 10, '[', ']');
         $result = $range->split(10);
         $this->assertCount(2, $result);
-        $this->assertEquals('[1,10)', (string)$result[0]);
-        $this->assertEquals('[10,10]', (string)$result[1]);
+        $this->assertEquals('[1,10)', (string) $result[0]);
+        $this->assertEquals('[10,10]', (string) $result[1]);
 
         $range = new IntRange(1, 10, '[', ']');
         $result = $range->split(0);
         $this->assertCount(1, $result);
-        $this->assertEquals('[1,10]', (string)$result[0]);
+        $this->assertEquals('[1,10]', (string) $result[0]);
 
         $range = new IntRange(1, 10, '[', ']');
         $result = $range->split(11);
         $this->assertCount(1, $result);
-        $this->assertEquals('[1,10]', (string)$result[0]);
+        $this->assertEquals('[1,10]', (string) $result[0]);
 
         $range = new IntRange(1, 10, '(', ')');
         $result = $range->split(5);
         $this->assertCount(2, $result);
-        $this->assertEquals('(1,5)', (string)$result[0]);
-        $this->assertEquals('[5,10)', (string)$result[1]);
+        $this->assertEquals('(1,5)', (string) $result[0]);
+        $this->assertEquals('[5,10)', (string) $result[1]);
 
         $range = new IntRange(1, 10, '[', ')');
         $result = $range->split(5);
         $this->assertCount(2, $result);
-        $this->assertEquals('[1,5)', (string)$result[0]);
-        $this->assertEquals('[5,10)', (string)$result[1]);
+        $this->assertEquals('[1,5)', (string) $result[0]);
+        $this->assertEquals('[5,10)', (string) $result[1]);
 
         $range = new IntRange(null, 10, '(', ']');
         $result = $range->split(0);
         $this->assertCount(2, $result);
-        $this->assertEquals('(,0)', (string)$result[0]);
-        $this->assertEquals('[0,10]', (string)$result[1]);
+        $this->assertEquals('(,0)', (string) $result[0]);
+        $this->assertEquals('[0,10]', (string) $result[1]);
 
         $range = new IntRange(1, null, '[', ')');
         $result = $range->split(5);
         $this->assertCount(2, $result);
-        $this->assertEquals('[1,5)', (string)$result[0]);
-        $this->assertEquals('[5,)', (string)$result[1]);
+        $this->assertEquals('[1,5)', (string) $result[0]);
+        $this->assertEquals('[5,)', (string) $result[1]);
     }
 
     public function testClone()
@@ -1426,31 +1425,31 @@ class IntRangeTest extends TestCase
     {
         $range = new IntRange(1, 10, '[', ']');
         $shifted = $range->shift(5);
-        $this->assertEquals('[6,15]', (string)$shifted);
+        $this->assertEquals('[6,15]', (string) $shifted);
 
         $range = new IntRange(1, 10, '[', ']');
         $shifted = $range->shift(-5);
-        $this->assertEquals('[-4,5]', (string)$shifted);
+        $this->assertEquals('[-4,5]', (string) $shifted);
 
         $range = new IntRange(null, 10, '(', ']');
         $shifted = $range->shift(5);
-        $this->assertEquals('(,15]', (string)$shifted);
+        $this->assertEquals('(,15]', (string) $shifted);
 
         $range = new IntRange(1, null, '[', ')');
         $shifted = $range->shift(5);
-        $this->assertEquals('[6,)', (string)$shifted);
+        $this->assertEquals('[6,)', (string) $shifted);
 
         $range = new IntRange(null, null, '(', ')');
         $shifted = $range->shift(5);
-        $this->assertEquals('(,)', (string)$shifted);
+        $this->assertEquals('(,)', (string) $shifted);
 
         $range = new IntRange(1, 10, '[', ']');
         $shifted = $range->shift(5);
-        $this->assertEquals('[1,10]', (string)$range);
+        $this->assertEquals('[1,10]', (string) $range);
 
         $range = new IntRange(1, 10, '(', ')');
         $shifted = $range->shift(5);
-        $this->assertEquals('(6,15)', (string)$shifted);
+        $this->assertEquals('(6,15)', (string) $shifted);
 
         $range = new IntRange(1, 10, '[', ']', 2);
         $shifted = $range->shift(5);
@@ -1461,47 +1460,47 @@ class IntRangeTest extends TestCase
     {
         $range = new IntRange(1, 10, '[', ']');
         $scaled = $range->scale(2);
-        $this->assertEquals('[2,20]', (string)$scaled);
+        $this->assertEquals('[2,20]', (string) $scaled);
 
         $range = new IntRange(1, 10, '[', ']');
         $scaled = $range->scale(-2);
-        $this->assertEquals('[-20,-2]', (string)$scaled);
+        $this->assertEquals('[-20,-2]', (string) $scaled);
 
         $range = new IntRange(null, 10, '(', ']');
         $scaled = $range->scale(2);
-        $this->assertEquals('(,20]', (string)$scaled);
+        $this->assertEquals('(,20]', (string) $scaled);
 
         $range = new IntRange(1, null, '[', ')');
         $scaled = $range->scale(2);
-        $this->assertEquals('[2,)', (string)$scaled);
+        $this->assertEquals('[2,)', (string) $scaled);
 
         $range = new IntRange(null, null, '(', ')');
         $scaled = $range->scale(2);
-        $this->assertEquals('(,)', (string)$scaled);
+        $this->assertEquals('(,)', (string) $scaled);
 
         $range = new IntRange(1, 10, '[', ']');
         $scaled = $range->scale(2);
-        $this->assertEquals('[2,20]', (string)$scaled);
+        $this->assertEquals('[2,20]', (string) $scaled);
 
         $range = new IntRange(1, 10, '(', ')');
         $scaled = $range->scale(2);
-        $this->assertEquals('(2,20)', (string)$scaled);
+        $this->assertEquals('(2,20)', (string) $scaled);
 
         $range = new IntRange(1, 10, '(', ')');
         $scaled = $range->scale(-2);
-        $this->assertEquals('(-20,-2)', (string)$scaled);
+        $this->assertEquals('(-20,-2)', (string) $scaled);
 
         $range = new IntRange(1, 10, '[', ']');
         $scaled = $range->scale(-2);
-        $this->assertEquals('[-20,-2]', (string)$scaled);
+        $this->assertEquals('[-20,-2]', (string) $scaled);
 
         $range = new IntRange(1, 10, '[', ')');
         $scaled = $range->scale(-2);
-        $this->assertEquals('(-20,-2]', (string)$scaled);
+        $this->assertEquals('(-20,-2]', (string) $scaled);
 
         $range = new IntRange(1, 10, '(', ']');
         $scaled = $range->scale(-2);
-        $this->assertEquals('[-20,-2)', (string)$scaled);
+        $this->assertEquals('[-20,-2)', (string) $scaled);
 
         $range = new IntRange(1, 10, '[', ']', 2);
         $scaled = $range->scale(3);

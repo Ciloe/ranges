@@ -8,7 +8,7 @@ use Exception;
 
 final class InvalidBoundException extends Exception
 {
-    public function __construct() 
+    public function __construct()
     {
         parent::__construct('The lower bound can\'t be greater than the upper bound');
     }

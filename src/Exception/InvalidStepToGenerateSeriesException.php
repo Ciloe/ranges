@@ -8,7 +8,7 @@ use Exception;
 
 final class InvalidStepToGenerateSeriesException extends Exception
 {
-    public function __construct() 
+    public function __construct()
     {
         parent::__construct('The step must be greater than the first occurrence in the range');
     }
