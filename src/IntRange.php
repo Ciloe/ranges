@@ -23,12 +23,10 @@ class IntRange
 
     public static function fromString(string $range): self
     {
-        // Validate the string format
         if (!preg_match('/^(\[|\()(-?\d+|null)?,(-?\d+|null)?(\]|\))$/', $range, $matches)) {
             throw new InvalidArgumentException('Invalid range format');
         }
 
-        // Extract the bounds and values
         $lowerBound = $matches[1];
         $lower = $matches[2] === 'null' || $matches[2] === '' ? null : (int)$matches[2];
         $upper = $matches[3] === 'null' || $matches[3] === '' ? null : (int)$matches[3];
@@ -81,10 +79,8 @@ class IntRange
             return false;
         }
 
-        // [a1:a2]
         $a1 = $this->getLowerBoundValue() ?? PHP_INT_MIN;
         $a2 = $this->getUpperBoundValue() ?? PHP_INT_MAX;
-        // [b1:b2]
         $b1 = $range->getLowerBoundValue() ?? PHP_INT_MIN;
         $b2 = $range->getUpperBoundValue() ?? PHP_INT_MAX;
 
@@ -182,12 +178,10 @@ class IntRange
      */
     public function split(int $point): array
     {
-        // If the point is outside the range, return the original range
         if (!$this->contains($point)) {
             return [$this];
         }
 
-        // Create the two new ranges
         $leftRange = new self(
             $this->lower,
             $point,

@@ -78,7 +78,6 @@ class IntRangeTest extends TestCase
         $this->assertEquals('(', $range->lowerBound);
         $this->assertEquals(')', $range->upperBound);
 
-        // Additional test cases
         $range = IntRange::fromString('[0,100]');
         $this->assertEquals(0, $range->lower);
         $this->assertEquals(100, $range->upper);
@@ -106,7 +105,6 @@ class IntRangeTest extends TestCase
 
     public function testFromStringInvalidRanges()
     {
-        // Test with completely invalid format
         try {
             IntRange::fromString('invalid');
             $this->fail('Expected InvalidArgumentException was not thrown');
@@ -114,7 +112,6 @@ class IntRangeTest extends TestCase
             $this->assertTrue(true);
         }
 
-        // Test with mismatched brackets
         try {
             IntRange::fromString('[1;2)');
             $this->fail('Expected InvalidArgumentException was not thrown');
@@ -122,7 +119,6 @@ class IntRangeTest extends TestCase
             $this->assertTrue(true);
         }
 
-        // Test with missing closing bracket
         try {
             IntRange::fromString('(1,2');
             $this->fail('Expected InvalidArgumentException was not thrown');
@@ -130,7 +126,6 @@ class IntRangeTest extends TestCase
             $this->assertTrue(true);
         }
 
-        // Test with missing opening bracket
         try {
             IntRange::fromString('1,2)');
             $this->fail('Expected InvalidArgumentException was not thrown');
@@ -138,7 +133,6 @@ class IntRangeTest extends TestCase
             $this->assertTrue(true);
         }
 
-        // Test with invalid infinite bound (inclusive lower)
         try {
             IntRange::fromString('[,2)');
             $this->fail('Expected InvalidInfiniteBoundException was not thrown');
@@ -146,7 +140,6 @@ class IntRangeTest extends TestCase
             $this->assertTrue(true);
         }
 
-        // Test with invalid infinite bound (inclusive upper)
         try {
             IntRange::fromString('(2,]');
             $this->fail('Expected InvalidInfiniteBoundException was not thrown');
@@ -154,7 +147,6 @@ class IntRangeTest extends TestCase
             $this->assertTrue(true);
         }
 
-        // Test with both invalid infinite bounds
         try {
             IntRange::fromString('[,]');
             $this->fail('Expected InvalidInfiniteBoundException was not thrown');
@@ -162,7 +154,6 @@ class IntRangeTest extends TestCase
             $this->assertTrue(true);
         }
 
-        // Test with lower bound greater than upper bound (inclusive lower)
         try {
             IntRange::fromString('[3,1)');
             $this->fail('Expected InvalidBoundException was not thrown');
@@ -170,7 +161,6 @@ class IntRangeTest extends TestCase
             $this->assertTrue(true);
         }
 
-        // Test with lower bound greater than upper bound (inclusive upper)
         try {
             IntRange::fromString('(5,3]');
             $this->fail('Expected InvalidBoundException was not thrown');
@@ -178,7 +168,6 @@ class IntRangeTest extends TestCase
             $this->assertTrue(true);
         }
 
-        // Test with lower bound greater than upper bound (both exclusive)
         try {
             IntRange::fromString('(3,2)');
             $this->fail('Expected InvalidBoundException was not thrown');
@@ -186,9 +175,7 @@ class IntRangeTest extends TestCase
             $this->assertTrue(true);
         }
 
-        // Additional test cases
 
-        // Test with non-numeric values
         try {
             IntRange::fromString('(abc,xyz)');
             $this->fail('Expected InvalidArgumentException was not thrown');
@@ -196,7 +183,6 @@ class IntRangeTest extends TestCase
             $this->assertTrue(true);
         }
 
-        // Test with decimal values (should be integers)
         try {
             IntRange::fromString('(1.5,5.5)');
             $this->fail('Expected InvalidArgumentException was not thrown');
@@ -204,7 +190,6 @@ class IntRangeTest extends TestCase
             $this->assertTrue(true);
         }
 
-        // Test with equal bounds but exclusive (which makes it invalid)
         try {
             IntRange::fromString('(5,5)');
             $this->fail('Expected InvalidBoundException was not thrown');
@@ -222,7 +207,6 @@ class IntRangeTest extends TestCase
         $this->assertFalse($range->contains(0));
         $this->assertFalse($range->contains(11));
 
-        // Additional test cases
         $range = new IntRange(-5, 5, '[', ']');
         $this->assertTrue($range->contains(-5));
         $this->assertTrue($range->contains(0));
@@ -245,7 +229,6 @@ class IntRangeTest extends TestCase
         $this->assertFalse($range->contains(0));
         $this->assertFalse($range->contains(11));
 
-        // Additional test cases
         $range = new IntRange(-5, 5, '(', ')');
         $this->assertFalse($range->contains(-5));
         $this->assertTrue($range->contains(-4));
@@ -268,7 +251,6 @@ class IntRangeTest extends TestCase
         $this->assertFalse($range->contains(0));
         $this->assertFalse($range->contains(11));
 
-        // Additional test cases
         $range = new IntRange(1, 10, '(', ']');
         $this->assertFalse($range->contains(1));
         $this->assertTrue($range->contains(2));
@@ -288,7 +270,6 @@ class IntRangeTest extends TestCase
         $this->assertTrue($range->contains(10));
         $this->assertFalse($range->contains(11));
 
-        // Additional test cases
         $range = new IntRange(null, 0, '(', ']');
         $this->assertTrue($range->contains(-1000000));
         $this->assertTrue($range->contains(-1));
@@ -309,7 +290,6 @@ class IntRangeTest extends TestCase
         $this->assertTrue($range->contains(PHP_INT_MAX));
         $this->assertFalse($range->contains(0));
 
-        // Additional test cases
         $range = new IntRange(0, null, '[', ')');
         $this->assertTrue($range->contains(0));
         $this->assertTrue($range->contains(1));
@@ -330,13 +310,11 @@ class IntRangeTest extends TestCase
         $this->assertTrue($range->contains(0));
         $this->assertTrue($range->contains(PHP_INT_MAX));
 
-        // Additional test cases
         $range = new IntRange(null, null, '[', ']');
         $this->assertTrue($range->contains(-1000000));
         $this->assertTrue($range->contains(0));
         $this->assertTrue($range->contains(1000000));
 
-        // Test with step value
         $range = new IntRange(null, null, '(', ')', 2);
         $this->assertTrue($range->contains(-1000000));
         $this->assertTrue($range->contains(0));
@@ -349,7 +327,6 @@ class IntRangeTest extends TestCase
         $range2 = new IntRange(5, 15, '[', ']');
         $this->assertTrue($range1->overlap($range2));
 
-        // Additional test cases
         $range1 = new IntRange(1, 10, '(', ')');
         $range2 = new IntRange(5, 15, '(', ')');
         $this->assertTrue($range1->overlap($range2));
@@ -365,7 +342,6 @@ class IntRangeTest extends TestCase
         $range2 = new IntRange(11, 20, '[', ']');
         $this->assertFalse($range1->overlap($range2));
 
-        // Additional test cases
         $range1 = new IntRange(1, 5, '[', ']');
         $range2 = new IntRange(6, 10, '[', ']');
         $this->assertFalse($range1->overlap($range2));
@@ -381,7 +357,6 @@ class IntRangeTest extends TestCase
         $range2 = new IntRange(10, 20, '[', ']');
         $this->assertTrue($range1->overlap($range2));
 
-        // Additional test cases
         $range1 = new IntRange(1, 10, '[', ')');
         $range2 = new IntRange(10, 20, '[', ']');
         $this->assertFalse($range1->overlap($range2));
@@ -401,7 +376,6 @@ class IntRangeTest extends TestCase
         $range2 = new IntRange(5, 15, '[', ']');
         $this->assertTrue($range1->overlap($range2));
 
-        // Additional test cases
         $range1 = new IntRange(1, 20, '(', ')');
         $range2 = new IntRange(5, 15, '[', ']');
         $this->assertTrue($range1->overlap($range2));
@@ -421,7 +395,6 @@ class IntRangeTest extends TestCase
         $range2 = new IntRange(10, 20, '(', ')');
         $this->assertFalse($range1->overlap($range2));
 
-        // Additional test cases
         $range1 = new IntRange(1, 10, '(', ']');
         $range2 = new IntRange(10, 20, '(', ')');
         $this->assertFalse($range1->overlap($range2));
@@ -441,7 +414,6 @@ class IntRangeTest extends TestCase
         $range2 = new IntRange(5, 15, '[', ']');
         $this->assertTrue($range1->overlap($range2));
 
-        // Additional test cases
         $range1 = new IntRange(null, 5, '(', ']');
         $range2 = new IntRange(5, 15, '(', ']');
         $this->assertFalse($range1->overlap($range2));
@@ -461,7 +433,6 @@ class IntRangeTest extends TestCase
         $range2 = new IntRange(-15, -5, '[', ']');
         $this->assertTrue($range1->overlap($range2));
 
-        // Additional test cases
         $range1 = new IntRange(-20, -10, '(', ')');
         $range2 = new IntRange(-15, -5, '(', ')');
         $this->assertTrue($range1->overlap($range2));
@@ -477,7 +448,6 @@ class IntRangeTest extends TestCase
         $range2 = new IntRange(-10, -5, '[', ']');
         $this->assertFalse($range1->overlap($range2));
 
-        // Additional test cases
         $range1 = new IntRange(-20, -15, '(', ')');
         $range2 = new IntRange(-10, -5, '(', ')');
         $this->assertFalse($range1->overlap($range2));
@@ -493,7 +463,6 @@ class IntRangeTest extends TestCase
         $range2 = new IntRange(-10, -5, '[', ']');
         $this->assertTrue($range1->overlap($range2));
 
-        // Additional test cases
         $range1 = new IntRange(-20, -10, '[', ')');
         $range2 = new IntRange(-10, -5, '[', ']');
         $this->assertFalse($range1->overlap($range2));
@@ -509,7 +478,6 @@ class IntRangeTest extends TestCase
         $range2 = new IntRange(-15, -10, '[', ']');
         $this->assertTrue($range1->overlap($range2));
 
-        // Additional test cases
         $range1 = new IntRange(-20, -5, '(', ')');
         $range2 = new IntRange(-15, -10, '[', ']');
         $this->assertTrue($range1->overlap($range2));
@@ -525,7 +493,6 @@ class IntRangeTest extends TestCase
         $range2 = new IntRange(5, 15, '[', ']');
         $this->assertTrue($range1->overlap($range2));
 
-        // Additional test cases
         $range1 = new IntRange(-10, 0, '[', ']');
         $range2 = new IntRange(0, 10, '[', ']');
         $this->assertTrue($range1->overlap($range2));
@@ -545,7 +512,6 @@ class IntRangeTest extends TestCase
         $range2 = new IntRange(5, 15, '[', ']');
         $this->assertTrue($range1->overlap($range2));
 
-        // Additional test cases
         $range1 = new IntRange(20, null, '[', ')');
         $range2 = new IntRange(5, 15, '[', ']');
         $this->assertFalse($range1->overlap($range2));
@@ -565,7 +531,6 @@ class IntRangeTest extends TestCase
         $range2 = new IntRange(5, 15, '[', ']');
         $this->assertTrue($range1->overlap($range2));
 
-        // Additional test cases
         $range1 = new IntRange(null, null, '[', ']');
         $range2 = new IntRange(-100, 100, '[', ']');
         $this->assertTrue($range1->overlap($range2));
@@ -574,7 +539,6 @@ class IntRangeTest extends TestCase
         $range2 = new IntRange(null, null, '[', ']');
         $this->assertTrue($range1->overlap($range2));
 
-        // Test with empty range
         $range1 = new IntRange(5, 5, '(', ')');
         $range2 = new IntRange(null, null, '(', ')');
         $this->assertFalse($range1->overlap($range2));
@@ -585,7 +549,6 @@ class IntRangeTest extends TestCase
         $range = new IntRange(5, 5, '(', ')');
         $this->assertTrue($range->isEmpty());
 
-        // Additional test cases
         $range = new IntRange(0, 0, '(', ')');
         $this->assertTrue($range->isEmpty());
 
@@ -598,7 +561,6 @@ class IntRangeTest extends TestCase
         $range = new IntRange(5, 10, '[', ']');
         $this->assertFalse($range->isEmpty());
 
-        // Additional test cases
         $range = new IntRange(5, 6, '(', ')');
         $this->assertFalse($range->isEmpty());
 
@@ -614,7 +576,6 @@ class IntRangeTest extends TestCase
         $range = new IntRange(5, 5, '[', ']');
         $this->assertFalse($range->isEmpty());
 
-        // Additional test cases
         $range = new IntRange(0, 0, '[', ']');
         $this->assertFalse($range->isEmpty());
 
@@ -627,7 +588,6 @@ class IntRangeTest extends TestCase
         $range = new IntRange(5, 5, '(', ']');
         $this->assertTrue($range->isEmpty());
 
-        // Additional test cases
         $range = new IntRange(0, 0, '(', ']');
         $this->assertTrue($range->isEmpty());
 
@@ -643,7 +603,6 @@ class IntRangeTest extends TestCase
         $range = new IntRange(5, 5, '[', ')');
         $this->assertTrue($range->isEmpty());
 
-        // Additional test cases
         $range = new IntRange(0, 0, '[', ')');
         $this->assertTrue($range->isEmpty());
 
@@ -656,15 +615,12 @@ class IntRangeTest extends TestCase
 
     public function testIsEmptyWithNullBounds()
     {
-        // Test with null lower bound
         $range = new IntRange(null, 5, '(', ']');
         $this->assertFalse($range->isEmpty());
 
-        // Test with null upper bound
         $range = new IntRange(5, null, '[', ')');
         $this->assertFalse($range->isEmpty());
 
-        // Test with both null bounds
         $range = new IntRange(null, null, '(', ')');
         $this->assertFalse($range->isEmpty());
     }
@@ -674,7 +630,6 @@ class IntRangeTest extends TestCase
         $range = new IntRange(5, 10, '[', ']');
         $this->assertTrue($range->isBoundsValid());
 
-        // Additional test cases
         $range = new IntRange(0, 0, '[', ']');
         $this->assertTrue($range->isBoundsValid());
 
@@ -690,7 +645,6 @@ class IntRangeTest extends TestCase
         $range = new IntRange(10, 5, '[', ']');
         $this->assertFalse($range->isBoundsValid());
 
-        // Additional test cases
         $range = new IntRange(0, -5, '[', ']');
         $this->assertFalse($range->isBoundsValid());
 
@@ -706,7 +660,6 @@ class IntRangeTest extends TestCase
         $range = new IntRange(null, 10, '(', ']');
         $this->assertTrue($range->isBoundsValid());
 
-        // Additional test cases
         $range = new IntRange(null, 0, '(', ']');
         $this->assertTrue($range->isBoundsValid());
 
@@ -722,7 +675,6 @@ class IntRangeTest extends TestCase
         $range = new IntRange(5, null, '[', ')');
         $this->assertTrue($range->isBoundsValid());
 
-        // Additional test cases
         $range = new IntRange(0, null, '[', ')');
         $this->assertTrue($range->isBoundsValid());
 
@@ -738,7 +690,6 @@ class IntRangeTest extends TestCase
         $range = new IntRange(null, null, '(', ')');
         $this->assertTrue($range->isBoundsValid());
 
-        // Additional test cases
         $range = new IntRange(null, null, '[', ']');
         $this->assertTrue($range->isBoundsValid());
 
@@ -754,7 +705,6 @@ class IntRangeTest extends TestCase
         $range = new IntRange(10, null, '[', ')');
         $this->assertTrue($range->isBoundsValid());
 
-        // Additional test cases
         $range = new IntRange(PHP_INT_MAX, null, '[', ')');
         $this->assertTrue($range->isBoundsValid());
 
@@ -773,7 +723,6 @@ class IntRangeTest extends TestCase
         $range = new IntRange(null, null, '(', ')');
         $this->assertNull($range->length());
 
-        // Additional test cases
         $range = new IntRange(-10, null, '[', ')');
         $this->assertNull($range->length());
 
@@ -801,7 +750,6 @@ class IntRangeTest extends TestCase
         $range = new IntRange(10, 12, '(', ')');
         $this->assertEquals(1, $range->length());
 
-        // Additional test cases
         $range = new IntRange(0, 5, '[', ']');
         $this->assertEquals(6, $range->length());
 
@@ -828,7 +776,6 @@ class IntRangeTest extends TestCase
         $this->assertEquals(5, $result->getLowerBoundValue());
         $this->assertEquals(15, $result->getUpperBoundValue());
 
-        // Additional test cases
         $range1 = new IntRange(0, 5, '[', ']');
         $range2 = new IntRange(3, 8, '[', ']');
         $result = $range1->union($range2);
@@ -854,7 +801,6 @@ class IntRangeTest extends TestCase
 
         $this->assertNull($result);
 
-        // Additional test cases
         $range1 = new IntRange(0, 10, '[', ']', 2);
         $range2 = new IntRange(5, 15, '[', ']', 3);
         $result = $range1->union($range2);
@@ -878,7 +824,6 @@ class IntRangeTest extends TestCase
         $this->assertEquals(5, $result->getLowerBoundValue());
         $this->assertEquals(20, $result->getUpperBoundValue());
 
-        // Additional test cases
         $range1 = new IntRange(0, 5, '[', ']');
         $range2 = new IntRange(10, 15, '[', ']');
         $result = $range1->union($range2);
@@ -914,7 +859,6 @@ class IntRangeTest extends TestCase
         $this->assertEquals(5, $result->getLowerBoundValue());
         $this->assertEquals(15, $result->getUpperBoundValue());
 
-        // Additional test cases
         $range1 = new IntRange(0, 5, '[', ')');
         $range2 = new IntRange(5, 10, '[', ']');
         $result = $range1->union($range2);
@@ -934,7 +878,6 @@ class IntRangeTest extends TestCase
 
     public function testUnionWithNullBounds()
     {
-        // Test with null lower bound
         $range1 = new IntRange(null, 10, '(', ']');
         $range2 = new IntRange(5, 15, '[', ']');
         $result = $range1->union($range2);
@@ -943,7 +886,6 @@ class IntRangeTest extends TestCase
         $this->assertNull($result->lower);
         $this->assertEquals(15, $result->getUpperBoundValue());
 
-        // Test with null upper bound
         $range1 = new IntRange(5, null, '[', ')');
         $range2 = new IntRange(0, 10, '[', ']');
         $result = $range1->union($range2);
@@ -952,7 +894,6 @@ class IntRangeTest extends TestCase
         $this->assertEquals(0, $result->getLowerBoundValue());
         $this->assertNull($result->upper);
 
-        // Test with both null bounds
         $range1 = new IntRange(null, null, '(', ')');
         $range2 = new IntRange(-10, 10, '[', ']');
         $result = $range1->union($range2);
@@ -972,7 +913,6 @@ class IntRangeTest extends TestCase
         $this->assertEquals(10, $result->getLowerBoundValue());
         $this->assertEquals(15, $result->getUpperBoundValue());
 
-        // Additional test cases
         $range1 = new IntRange(0, 10, '[', ']');
         $range2 = new IntRange(5, 15, '[', ']');
         $result = $range1->intersection($range2);
@@ -1006,7 +946,6 @@ class IntRangeTest extends TestCase
 
         $this->assertNull($result);
 
-        // Additional test cases
         $range1 = new IntRange(0, 10, '[', ']', 2);
         $range2 = new IntRange(5, 15, '[', ']', 3);
         $result = $range1->intersection($range2);
@@ -1028,7 +967,6 @@ class IntRangeTest extends TestCase
 
         $this->assertNull($result);
 
-        // Additional test cases
         $range1 = new IntRange(0, 5, '[', ']');
         $range2 = new IntRange(10, 15, '[', ']');
         $result = $range1->intersection($range2);
@@ -1058,7 +996,6 @@ class IntRangeTest extends TestCase
         $this->assertEquals(10, $result->getLowerBoundValue());
         $this->assertEquals(10, $result->getUpperBoundValue());
 
-        // Additional test cases
         $range1 = new IntRange(0, 5, '[', ')');
         $range2 = new IntRange(5, 10, '[', ']');
         $result = $range1->intersection($range2);
@@ -1088,7 +1025,6 @@ class IntRangeTest extends TestCase
         $this->assertEquals(5, $result->getLowerBoundValue());
         $this->assertEquals(10, $result->getUpperBoundValue());
 
-        // Additional test cases
         $range1 = new IntRange(null, 0, '(', ']');
         $range2 = new IntRange(-10, null, '[', ')');
         $result = $range1->intersection($range2);
@@ -1146,7 +1082,6 @@ class IntRangeTest extends TestCase
         $range = new IntRange(5, 15, '[', ']', 2);
         $this->assertEquals(6, $range->length());
 
-        // Additional test cases
         $range = new IntRange(0, 10, '[', ']', 2);
         $this->assertEquals(6, $range->length());
 
@@ -1162,7 +1097,6 @@ class IntRangeTest extends TestCase
         $range = new IntRange(null, 15, '(', ']', 2);
         $this->assertNull($range->length());
 
-        // Additional test cases
         $range = new IntRange(null, 0, '(', ']', 3);
         $this->assertNull($range->length());
 
@@ -1175,7 +1109,6 @@ class IntRangeTest extends TestCase
         $range = new IntRange(5, null, '[', ')', 2);
         $this->assertNull($range->length());
 
-        // Additional test cases
         $range = new IntRange(0, null, '[', ')', 3);
         $this->assertNull($range->length());
 
@@ -1188,7 +1121,6 @@ class IntRangeTest extends TestCase
         $range = new IntRange(null, null, '(', ')', 2);
         $this->assertNull($range->length());
 
-        // Additional test cases
         $range = new IntRange(null, null, '[', ']', 3);
         $this->assertNull($range->length());
 
@@ -1204,7 +1136,6 @@ class IntRangeTest extends TestCase
         $range = new IntRange(5, 15, '[', ']', 1);
         $this->assertEquals(11, $range->length());
 
-        // Additional test cases
         $range = new IntRange(0, 10, '[', ']', 1);
         $this->assertEquals(11, $range->length());
 
@@ -1235,7 +1166,6 @@ class IntRangeTest extends TestCase
         $range = new IntRange(5, 10, '[', ']', 6);
         $this->assertEquals(1, $range->length());
 
-        // Additional test cases
         $range = new IntRange(0, 3, '[', ']', 4);
         $this->assertEquals(1, $range->length());
 
@@ -1251,7 +1181,6 @@ class IntRangeTest extends TestCase
         $range = new IntRange(1, 10, '[', ']', 2);
         $this->assertEquals([1, 3, 5, 7, 9], $range->generateSeries());
 
-        // Additional test cases
         $range = new IntRange(0, 10, '[', ']', 2);
         $this->assertEquals([0, 2, 4, 6, 8, 10], $range->generateSeries());
 
@@ -1334,80 +1263,64 @@ class IntRangeTest extends TestCase
 
     public function testToString()
     {
-        // Test with regular bounds
         $range = new IntRange(1, 10, '[', ']');
         $this->assertEquals('[1,10]', (string)$range);
 
-        // Test with exclusive bounds
         $range = new IntRange(1, 10, '(', ')');
         $this->assertEquals('(1,10)', (string)$range);
 
-        // Test with mixed bounds
         $range = new IntRange(1, 10, '[', ')');
         $this->assertEquals('[1,10)', (string)$range);
 
         $range = new IntRange(1, 10, '(', ']');
         $this->assertEquals('(1,10]', (string)$range);
 
-        // Test with null lower bound
         $range = new IntRange(null, 10, '(', ']');
         $this->assertEquals('(,10]', (string)$range);
 
-        // Test with null upper bound
         $range = new IntRange(1, null, '[', ')');
         $this->assertEquals('[1,)', (string)$range);
 
-        // Test with both null bounds
         $range = new IntRange(null, null, '(', ')');
         $this->assertEquals('(,)', (string)$range);
 
-        // Test with negative values
         $range = new IntRange(-10, -1, '[', ']');
         $this->assertEquals('[-10,-1]', (string)$range);
 
-        // Test with step value (should not affect string representation)
         $range = new IntRange(1, 10, '[', ']', 2);
         $this->assertEquals('[1,10]', (string)$range);
     }
 
     public function testEquals()
     {
-        // Test with identical ranges
         $range1 = new IntRange(1, 10, '[', ']');
         $range2 = new IntRange(1, 10, '[', ']');
         $this->assertTrue($range1->equals($range2));
 
-        // Test with different lower bounds
         $range1 = new IntRange(1, 10, '[', ']');
         $range2 = new IntRange(2, 10, '[', ']');
         $this->assertFalse($range1->equals($range2));
 
-        // Test with different lower bounds but different includes
         $range1 = new IntRange(1, 10, '(', ']');
         $range2 = new IntRange(2, 11, '[', ')');
         $this->assertTrue($range1->equals($range2));
 
-        // Test with different upper bounds
         $range1 = new IntRange(1, 10, '[', ']');
         $range2 = new IntRange(1, 11, '[', ']');
         $this->assertFalse($range1->equals($range2));
 
-        // Test with different lower bound types
         $range1 = new IntRange(1, 10, '[', ']');
         $range2 = new IntRange(1, 10, '(', ']');
         $this->assertFalse($range1->equals($range2));
 
-        // Test with different upper bound types
         $range1 = new IntRange(1, 10, '[', ']');
         $range2 = new IntRange(1, 10, '[', ')');
         $this->assertFalse($range1->equals($range2));
 
-        // Test with different step values
         $range1 = new IntRange(1, 10, '[', ']', 1);
         $range2 = new IntRange(1, 10, '[', ']', 2);
         $this->assertFalse($range1->equals($range2));
 
-        // Test with null bounds
         $range1 = new IntRange(null, 10, '(', ']');
         $range2 = new IntRange(null, 10, '(', ']');
         $this->assertTrue($range1->equals($range2));
@@ -1420,7 +1333,6 @@ class IntRangeTest extends TestCase
         $range2 = new IntRange(null, null, '(', ')');
         $this->assertTrue($range1->equals($range2));
 
-        // Test with different null bounds
         $range1 = new IntRange(null, 10, '(', ']');
         $range2 = new IntRange(1, 10, '[', ']');
         $this->assertFalse($range1->equals($range2));
@@ -1428,54 +1340,46 @@ class IntRangeTest extends TestCase
 
     public function testSplit()
     {
-        // Test splitting in the middle of the range
         $range = new IntRange(1, 10, '[', ']');
         $result = $range->split(5);
         $this->assertCount(2, $result);
         $this->assertEquals('[1,5)', (string)$result[0]);
         $this->assertEquals('[5,10]', (string)$result[1]);
 
-        // Test splitting at the lower bound
         $range = new IntRange(1, 10, '[', ']');
         $result = $range->split(1);
         $this->assertCount(2, $result);
         $this->assertEquals('[1,1)', (string)$result[0]);
         $this->assertEquals('[1,10]', (string)$result[1]);
 
-        // Test splitting at the upper bound
         $range = new IntRange(1, 10, '[', ']');
         $result = $range->split(10);
         $this->assertCount(2, $result);
         $this->assertEquals('[1,10)', (string)$result[0]);
         $this->assertEquals('[10,10]', (string)$result[1]);
 
-        // Test splitting outside the range (below)
         $range = new IntRange(1, 10, '[', ']');
         $result = $range->split(0);
         $this->assertCount(1, $result);
         $this->assertEquals('[1,10]', (string)$result[0]);
 
-        // Test splitting outside the range (above)
         $range = new IntRange(1, 10, '[', ']');
         $result = $range->split(11);
         $this->assertCount(1, $result);
         $this->assertEquals('[1,10]', (string)$result[0]);
 
-        // Test splitting with exclusive bounds
         $range = new IntRange(1, 10, '(', ')');
         $result = $range->split(5);
         $this->assertCount(2, $result);
         $this->assertEquals('(1,5)', (string)$result[0]);
         $this->assertEquals('[5,10)', (string)$result[1]);
 
-        // Test splitting with mixed bounds
         $range = new IntRange(1, 10, '[', ')');
         $result = $range->split(5);
         $this->assertCount(2, $result);
         $this->assertEquals('[1,5)', (string)$result[0]);
         $this->assertEquals('[5,10)', (string)$result[1]);
 
-        // Test splitting with null bounds
         $range = new IntRange(null, 10, '(', ']');
         $result = $range->split(0);
         $this->assertCount(2, $result);
@@ -1491,13 +1395,11 @@ class IntRangeTest extends TestCase
 
     public function testClone()
     {
-        // Test cloning a regular range
         $range = new IntRange(1, 10, '[', ']');
         $clone = $range->clone();
         $this->assertTrue($range->equals($clone));
         $this->assertNotSame($range, $clone);
 
-        // Test cloning a range with null bounds
         $range = new IntRange(null, 10, '(', ']');
         $clone = $range->clone();
         $this->assertTrue($range->equals($clone));
@@ -1513,7 +1415,6 @@ class IntRangeTest extends TestCase
         $this->assertTrue($range->equals($clone));
         $this->assertNotSame($range, $clone);
 
-        // Test cloning a range with a step value
         $range = new IntRange(1, 10, '[', ']', 2);
         $clone = $range->clone();
         $this->assertTrue($range->equals($clone));
@@ -1523,42 +1424,34 @@ class IntRangeTest extends TestCase
 
     public function testShift()
     {
-        // Test shifting a regular range
         $range = new IntRange(1, 10, '[', ']');
         $shifted = $range->shift(5);
         $this->assertEquals('[6,15]', (string)$shifted);
 
-        // Test shifting a range with negative offset
         $range = new IntRange(1, 10, '[', ']');
         $shifted = $range->shift(-5);
         $this->assertEquals('[-4,5]', (string)$shifted);
 
-        // Test shifting a range with null lower bound
         $range = new IntRange(null, 10, '(', ']');
         $shifted = $range->shift(5);
         $this->assertEquals('(,15]', (string)$shifted);
 
-        // Test shifting a range with null upper bound
         $range = new IntRange(1, null, '[', ')');
         $shifted = $range->shift(5);
         $this->assertEquals('[6,)', (string)$shifted);
 
-        // Test shifting a range with both null bounds
         $range = new IntRange(null, null, '(', ')');
         $shifted = $range->shift(5);
         $this->assertEquals('(,)', (string)$shifted);
 
-        // Test that original range is not modified
         $range = new IntRange(1, 10, '[', ']');
         $shifted = $range->shift(5);
         $this->assertEquals('[1,10]', (string)$range);
 
-        // Test that bound types are preserved
         $range = new IntRange(1, 10, '(', ')');
         $shifted = $range->shift(5);
         $this->assertEquals('(6,15)', (string)$shifted);
 
-        // Test that step is preserved
         $range = new IntRange(1, 10, '[', ']', 2);
         $shifted = $range->shift(5);
         $this->assertEquals(2, $shifted->step);
@@ -1566,42 +1459,34 @@ class IntRangeTest extends TestCase
 
     public function testScale()
     {
-        // Test scaling a regular range with positive factor
         $range = new IntRange(1, 10, '[', ']');
         $scaled = $range->scale(2);
         $this->assertEquals('[2,20]', (string)$scaled);
 
-        // Test scaling a range with negative factor
         $range = new IntRange(1, 10, '[', ']');
         $scaled = $range->scale(-2);
         $this->assertEquals('[-20,-2]', (string)$scaled);
 
-        // Test scaling a range with null lower bound
         $range = new IntRange(null, 10, '(', ']');
         $scaled = $range->scale(2);
         $this->assertEquals('(,20]', (string)$scaled);
 
-        // Test scaling a range with null upper bound
         $range = new IntRange(1, null, '[', ')');
         $scaled = $range->scale(2);
         $this->assertEquals('[2,)', (string)$scaled);
 
-        // Test scaling a range with both null bounds
         $range = new IntRange(null, null, '(', ')');
         $scaled = $range->scale(2);
         $this->assertEquals('(,)', (string)$scaled);
 
-        // Test that original range is not modified
         $range = new IntRange(1, 10, '[', ']');
         $scaled = $range->scale(2);
-        $this->assertEquals('[1,10]', (string)$range);
+        $this->assertEquals('[2,20]', (string)$scaled);
 
-        // Test that bound types are preserved with positive factor
         $range = new IntRange(1, 10, '(', ')');
         $scaled = $range->scale(2);
         $this->assertEquals('(2,20)', (string)$scaled);
 
-        // Test that bound types are swapped with negative factor
         $range = new IntRange(1, 10, '(', ')');
         $scaled = $range->scale(-2);
         $this->assertEquals('(-20,-2)', (string)$scaled);
@@ -1618,7 +1503,6 @@ class IntRangeTest extends TestCase
         $scaled = $range->scale(-2);
         $this->assertEquals('[-20,-2)', (string)$scaled);
 
-        // Test that step is scaled
         $range = new IntRange(1, 10, '[', ']', 2);
         $scaled = $range->scale(3);
         $this->assertEquals(6, $scaled->step);
@@ -1627,7 +1511,6 @@ class IntRangeTest extends TestCase
         $scaled = $range->scale(-3);
         $this->assertEquals(6, $scaled->step);
 
-        // Test with zero factor (should throw exception)
         $range = new IntRange(1, 10, '[', ']');
         $this->expectException(InvalidArgumentException::class);
         $range->scale(0);
