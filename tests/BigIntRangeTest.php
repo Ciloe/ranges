@@ -378,4 +378,165 @@ class BigIntRangeTest extends TestCase
         $this->assertSame('0', $series[10]);
         $this->assertSame('10', $series[20]);
     }
+
+    public function testIsEmptyWithEmptyRange(): void
+    {
+        $range = new BigIntRange('5', '5', '(', ')');
+        $this->assertTrue($range->isEmpty());
+
+        $range = new BigIntRange('5', '5', '[', ')');
+        $this->assertTrue($range->isEmpty());
+
+        $range = new BigIntRange('5', '5', '(', ']');
+        $this->assertTrue($range->isEmpty());
+    }
+
+    public function testIsEmptyWithNonEmptyRange(): void
+    {
+        $range = new BigIntRange('5', '5', '[', ']');
+        $this->assertFalse($range->isEmpty());
+
+        $range = new BigIntRange('5', '10', '(', ')');
+        $this->assertFalse($range->isEmpty());
+
+        $range = new BigIntRange('5', '10', '[', ']');
+        $this->assertFalse($range->isEmpty());
+    }
+
+    public function testIsEmptyWithNullBounds(): void
+    {
+        $range = new BigIntRange(null, null, '(', ')');
+        $this->assertFalse($range->isEmpty());
+
+        $range = new BigIntRange('5', null, '[', ')');
+        $this->assertFalse($range->isEmpty());
+
+        $range = new BigIntRange(null, '5', '(', ']');
+        $this->assertFalse($range->isEmpty());
+    }
+
+    public function testIsBoundsValidWithValidBounds(): void
+    {
+        $range = new BigIntRange('5', '10', '[', ']');
+        $this->assertTrue($range->isBoundsValid());
+
+        $range = new BigIntRange('5', '5', '[', ']');
+        $this->assertTrue($range->isBoundsValid());
+
+        $range = new BigIntRange('-10', '10', '[', ']');
+        $this->assertTrue($range->isBoundsValid());
+    }
+
+    public function testIsBoundsValidWithInvalidBounds(): void
+    {
+        $range = new BigIntRange('10', '5', '[', ']');
+        $this->assertFalse($range->isBoundsValid());
+
+        $range = new BigIntRange('10', '5', '(', ')');
+        $this->assertFalse($range->isBoundsValid());
+    }
+
+    public function testIsBoundsValidWithNullBounds(): void
+    {
+        $range = new BigIntRange(null, null, '(', ')');
+        $this->assertTrue($range->isBoundsValid());
+
+        $range = new BigIntRange('5', null, '[', ')');
+        $this->assertTrue($range->isBoundsValid());
+
+        $range = new BigIntRange(null, '5', '(', ']');
+        $this->assertTrue($range->isBoundsValid());
+    }
+
+    public function testEquals(): void
+    {
+        $range1 = new BigIntRange('5', '10', '[', ']');
+        $range2 = new BigIntRange('5', '10', '[', ']');
+        $range3 = new BigIntRange('5', '10', '(', ']');
+        $range4 = new BigIntRange('5', '10', '[', ')', '2');
+
+        $this->assertTrue($range1->equals($range2));
+        $this->assertFalse($range1->equals($range3));
+        $this->assertFalse($range1->equals($range4));
+
+        // Test avec des valeurs très grandes
+        $range1 = new BigIntRange('9223372036854775808', '9223372036854775810', '[', ']');
+        $range2 = new BigIntRange('9223372036854775808', '9223372036854775810', '[', ']');
+        $this->assertTrue($range1->equals($range2));
+    }
+
+    public function testClone(): void
+    {
+        $range = new BigIntRange('5', '10', '[', ']', '2');
+        $cloned = $range->clone();
+
+        $this->assertNotSame($range, $cloned);
+        $this->assertTrue($range->equals($cloned));
+
+        // Test avec des valeurs très grandes
+        $range = new BigIntRange('9223372036854775808', '9223372036854775810', '[', ']', '2');
+        $cloned = $range->clone();
+
+        $this->assertNotSame($range, $cloned);
+        $this->assertTrue($range->equals($cloned));
+    }
+
+    public function testToString(): void
+    {
+        $range = new BigIntRange('5', '10', '[', ']');
+        $this->assertSame('[5,10]', (string) $range);
+
+        $range = new BigIntRange('5', '10', '(', ')');
+        $this->assertSame('(5,10)', (string) $range);
+
+        $range = new BigIntRange(null, '10', '(', ')');
+        $this->assertSame('(,10)', (string) $range);
+
+        $range = new BigIntRange('5', null, '[', ')');
+        $this->assertSame('[5,)', (string) $range);
+
+        $range = new BigIntRange(null, null, '(', ')');
+        $this->assertSame('(,)', (string) $range);
+
+        // Test avec des valeurs très grandes
+        $range = new BigIntRange('9223372036854775808', '9223372036854775810', '[', ']');
+        $this->assertSame('[9223372036854775808,9223372036854775810]', (string) $range);
+    }
+
+    public function testGenerateSeriesWithEmptyRange(): void
+    {
+        $range = new BigIntRange('5', '5', '(', ')');
+        $this->assertSame([], $range->generateSeries());
+    }
+
+    public function testGenerateSeriesWithSinglePointRange(): void
+    {
+        $range = new BigIntRange('5', '5', '[', ']');
+        $series = $range->generateSeries();
+
+        $this->assertCount(1, $series);
+        $this->assertSame('5', $series[0]);
+    }
+
+    public function testGenerateSeriesWithDifferentSteps(): void
+    {
+        $range = new BigIntRange('1', '10', '[', ']', '2');
+        $series = $range->generateSeries();
+
+        $this->assertCount(5, $series);
+        $this->assertSame('1', $series[0]);
+        $this->assertSame('3', $series[1]);
+        $this->assertSame('5', $series[2]);
+        $this->assertSame('7', $series[3]);
+        $this->assertSame('9', $series[4]);
+
+        $range = new BigIntRange('1', '10', '[', ']', '3');
+        $series = $range->generateSeries();
+
+        $this->assertCount(4, $series);
+        $this->assertSame('1', $series[0]);
+        $this->assertSame('4', $series[1]);
+        $this->assertSame('7', $series[2]);
+        $this->assertSame('10', $series[3]);
+    }
 }

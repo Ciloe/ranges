@@ -11,7 +11,10 @@ use Ciloe\Ranges\Exception\InvalidStepToGenerateSeriesException;
 use Exception;
 use InvalidArgumentException;
 
-class IntRange
+/**
+ * @implements RangeInterface<int>
+ */
+class IntRange implements RangeInterface
 {
     public function __construct(
         readonly public ?int $lower = null,
@@ -79,15 +82,26 @@ class IntRange
         return $this->upper === null ? null : ($this->upperBound === ']' ? $this->upper : $this->upper - 1);
     }
 
-    public function contains(int $int): bool
+    /**
+     * @param int $value
+     */
+    public function contains(mixed $value): bool
     {
-        $lower = $this->getLowerBoundValue() ?? (int) PHP_INT_MIN;
-        $upper = $this->getUpperBoundValue() ?? (int) PHP_INT_MAX;
+        if (! is_int($value)) {
+            throw new InvalidArgumentException('Value must be an integer');
+        }
 
-        return $lower <= $int && $int <= $upper;
+        if ($this->isEmpty()) {
+            return false;
+        }
+
+        $lower = $this->getLowerBoundValue() ?? PHP_INT_MIN;
+        $upper = $this->getUpperBoundValue() ?? PHP_INT_MAX;
+
+        return $lower <= $value && $value <= $upper;
     }
 
-    public function overlap(self $range): bool
+    public function overlap(RangeInterface $range): bool
     {
         if ($this->isEmpty() || $range->isEmpty()) {
             return false;
@@ -111,16 +125,16 @@ class IntRange
         }
 
         $diff = ($upper - $lower);
-        $includeUpper = $diff % $this->step === 0;
+        $includeUpper = $diff % $this->getStep() === 0;
 
-        $length = (int) ceil(($upper - $lower) / $this->step) + ($includeUpper ? 1 : 0);
+        $length = (int) ceil(($upper - $lower) / $this->getStep()) + ($includeUpper ? 1 : 0);
 
         return max($length, 0);
     }
 
-    public function union(self $range): ?self
+    public function union(RangeInterface $range): ?self
     {
-        if ($this->step !== $range->step) {
+        if ($this->getStep() !== $range->getStep()) {
             return null;
         }
 
@@ -132,9 +146,9 @@ class IntRange
         return new self($lower, $upper, '[', ']');
     }
 
-    public function intersection(self $range): ?self
+    public function intersection(RangeInterface $range): ?self
     {
-        if ($this->step !== $range->step) {
+        if ($this->getStep() !== $range->getStep()) {
             return null;
         }
 
@@ -164,28 +178,33 @@ class IntRange
             throw new CantGenerateSeriesBecauseTheArrayIsTooLarge();
         }
 
-        if ($upper !== $lower && ($upper - $lower) < $this->step) {
+        if ($lower > $upper) {
+            return [];
+        }
+
+        if ($upper !== $lower && ($upper - $lower) < $this->getStep()) {
             throw new InvalidStepToGenerateSeriesException();
         }
 
         try {
-            return range($lower, $upper, $this->step);
+            return range($lower, $upper, $this->getStep());
         } catch (Exception $e) {
             throw new CantGenerateSeriesBecauseTheArrayIsTooLarge($e);
         }
     }
 
-    public function equals(self $range): bool
+    public function equals(RangeInterface $range): bool
     {
         return $this->getLowerBoundValue() === $range->getLowerBoundValue() &&
                $this->getUpperBoundValue() === $range->getUpperBoundValue() &&
-               $this->step === $range->step;
+               $this->getStep() === $range->getStep();
     }
 
     /**
+     * @param int $point
      * @return array<IntRange>
      */
-    public function split(int $point): array
+    public function split($point): array
     {
         if (! $this->contains($point)) {
             return [$this];
@@ -196,7 +215,7 @@ class IntRange
             $point,
             $this->lowerBound,
             ')',
-            $this->step
+            $this->getStep()
         );
 
         $rightRange = new self(
@@ -204,7 +223,7 @@ class IntRange
             $this->upper,
             '[',
             $this->upperBound,
-            $this->step
+            $this->getStep()
         );
 
         return [$leftRange, $rightRange];
@@ -217,11 +236,14 @@ class IntRange
             $this->upper,
             $this->lowerBound,
             $this->upperBound,
-            $this->step
+            $this->getStep()
         );
     }
 
-    public function shift(int $offset): self
+    /**
+     * @param int $offset
+     */
+    public function shift($offset): self
     {
         $newLower = $this->lower === null ? null : $this->lower + $offset;
         $newUpper = $this->upper === null ? null : $this->upper + $offset;
@@ -231,11 +253,14 @@ class IntRange
             $newUpper,
             $this->lowerBound,
             $this->upperBound,
-            $this->step
+            $this->getStep()
         );
     }
 
-    public function scale(int $factor): self
+    /**
+     * @param int $factor
+     */
+    public function scale($factor): self
     {
         if ($factor === 0) {
             throw new InvalidArgumentException('Scale factor cannot be zero');
@@ -261,7 +286,12 @@ class IntRange
             $newUpper,
             $lowerBound,
             $upperBound,
-            $this->step * abs($factor)
+            $this->getStep() * abs($factor)
         );
+    }
+
+    public function getStep(): int
+    {
+        return $this->step;
     }
 }
