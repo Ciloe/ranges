@@ -81,8 +81,12 @@ class IntRange
 
     public function contains(int $int): bool
     {
-        $lower = $this->getLowerBoundValue() ?? (int) PHP_INT_MIN;
-        $upper = $this->getUpperBoundValue() ?? (int) PHP_INT_MAX;
+        if ($this->isEmpty()) {
+            return false;
+        }
+
+        $lower = $this->getLowerBoundValue() ?? PHP_INT_MIN;
+        $upper = $this->getUpperBoundValue() ?? PHP_INT_MAX;
 
         return $lower <= $int && $int <= $upper;
     }
@@ -162,6 +166,10 @@ class IntRange
 
         if ($lower === null || $upper === null) {
             throw new CantGenerateSeriesBecauseTheArrayIsTooLarge();
+        }
+
+        if ($lower > $upper) {
+            return [];
         }
 
         if ($upper !== $lower && ($upper - $lower) < $this->step) {

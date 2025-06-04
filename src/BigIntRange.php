@@ -20,7 +20,6 @@ class BigIntRange
         readonly public string $upperBound = ')',
         public string $step = '1',
     ) {
-        // Validate that inputs are valid numeric strings
         if ($lower !== null && ! is_numeric($lower)) {
             throw new InvalidArgumentException('Lower bound must be a valid numeric string');
         }
@@ -110,6 +109,10 @@ class BigIntRange
             throw new InvalidArgumentException('Value must be a valid numeric string');
         }
 
+        if ($this->isEmpty()) {
+            return false;
+        }
+
         $lower = $this->getLowerBoundValue();
         $upper = $this->getUpperBoundValue();
 
@@ -130,7 +133,6 @@ class BigIntRange
         $b1 = $range->getLowerBoundValue();
         $b2 = $range->getUpperBoundValue();
 
-        // If either range has null bounds, they overlap
         if ($a1 === null || $a2 === null || $b1 === null || $b2 === null) {
             return true;
         }
@@ -147,16 +149,17 @@ class BigIntRange
             return null;
         }
 
-        // Calculate difference
+        if (bccomp($lower, $upper) > 0) {
+            return '0';
+        }
+
         $diff = bcsub($upper, $lower);
 
-        // Check if upper bound is included
-        $includeUpper = bcmod($diff, $this->step) === '0';
+        $includeUpper = bcmod($diff, $this->step) === '0' ? '1' : '0';
 
-        // Calculate length
-        $length = bcadd(bcdiv($diff, $this->step), $includeUpper ? '1' : '0');
+        $length = bcadd(bcdiv($diff, $this->step, 0), $includeUpper);
 
-        return bccomp($length, '0') <= 0 ? '0' : $length;
+        return $length;
     }
 
     public function union(self $range): ?self
@@ -170,14 +173,12 @@ class BigIntRange
         $thisUpper = $this->getUpperBoundValue();
         $rangeUpper = $range->getUpperBoundValue();
 
-        // Determine the lower bound of the union
         if ($thisLower === null || $rangeLower === null) {
             $lower = null;
         } else {
             $lower = bccomp($thisLower, $rangeLower) <= 0 ? $thisLower : $rangeLower;
         }
 
-        // Determine the upper bound of the union
         if ($thisUpper === null || $rangeUpper === null) {
             $upper = null;
         } else {
@@ -198,7 +199,6 @@ class BigIntRange
         $thisUpper = $this->getUpperBoundValue();
         $rangeUpper = $range->getUpperBoundValue();
 
-        // Determine the lower bound of the intersection
         if ($thisLower === null) {
             $lower = $rangeLower;
         } elseif ($rangeLower === null) {
@@ -207,7 +207,6 @@ class BigIntRange
             $lower = bccomp($thisLower, $rangeLower) >= 0 ? $thisLower : $rangeLower;
         }
 
-        // Determine the upper bound of the intersection
         if ($thisUpper === null) {
             $upper = $rangeUpper;
         } elseif ($rangeUpper === null) {
@@ -216,7 +215,6 @@ class BigIntRange
             $upper = bccomp($thisUpper, $rangeUpper) <= 0 ? $thisUpper : $rangeUpper;
         }
 
-        // Check if the intersection is empty
         if ($lower !== null && $upper !== null && bccomp($lower, $upper) > 0) {
             return null;
         }
@@ -240,25 +238,32 @@ class BigIntRange
             throw new CantGenerateSeriesBecauseTheArrayIsTooLarge();
         }
 
+        if (bccomp($lower, $upper) > 0) {
+            return [];
+        }
+
         if (bccomp($upper, $lower) !== 0 && bccomp(bcsub($upper, $lower), $this->step) < 0) {
             throw new InvalidStepToGenerateSeriesException();
         }
 
+        $estimatedSize = min(1000000, (int)bcadd(bcdiv(bcsub($upper, $lower), $this->step, 0), '1'));
+        $series = [];
+        $series = array_pad($series, $estimatedSize, null);
+
         try {
-            $series = [];
+            $count = 0;
             $current = $lower;
 
             while (bccomp($current, $upper) <= 0) {
-                $series[] = $current;
+                $series[$count++] = $current;
                 $current = bcadd($current, $this->step);
 
-                // Safety check to prevent infinite loops
-                if (count($series) > 1000000) {
+                if ($count > 1000000) {
                     throw new CantGenerateSeriesBecauseTheArrayIsTooLarge();
                 }
             }
 
-            return $series;
+            return array_slice($series, 0, $count);
         } catch (Exception $e) {
             throw new CantGenerateSeriesBecauseTheArrayIsTooLarge($e);
         }
