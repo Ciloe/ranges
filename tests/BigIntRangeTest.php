@@ -484,23 +484,23 @@ class BigIntRangeTest extends TestCase
     public function testToString(): void
     {
         $range = new BigIntRange('5', '10', '[', ']');
-        $this->assertSame('[5,10]', (string)$range);
+        $this->assertSame('[5,10]', (string) $range);
 
         $range = new BigIntRange('5', '10', '(', ')');
-        $this->assertSame('(5,10)', (string)$range);
+        $this->assertSame('(5,10)', (string) $range);
 
         $range = new BigIntRange(null, '10', '(', ')');
-        $this->assertSame('(,10)', (string)$range);
+        $this->assertSame('(,10)', (string) $range);
 
         $range = new BigIntRange('5', null, '[', ')');
-        $this->assertSame('[5,)', (string)$range);
+        $this->assertSame('[5,)', (string) $range);
 
         $range = new BigIntRange(null, null, '(', ')');
-        $this->assertSame('(,)', (string)$range);
+        $this->assertSame('(,)', (string) $range);
 
         // Test avec des valeurs très grandes
         $range = new BigIntRange('9223372036854775808', '9223372036854775810', '[', ']');
-        $this->assertSame('[9223372036854775808,9223372036854775810]', (string)$range);
+        $this->assertSame('[9223372036854775808,9223372036854775810]', (string) $range);
     }
 
     public function testGenerateSeriesWithEmptyRange(): void

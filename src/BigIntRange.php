@@ -11,7 +11,10 @@ use Ciloe\Ranges\Exception\InvalidStepToGenerateSeriesException;
 use Exception;
 use InvalidArgumentException;
 
-class BigIntRange
+/**
+ * @implements RangeInterface<string>
+ */
+class BigIntRange implements RangeInterface
 {
     public function __construct(
         readonly public ?string $lower = null,
@@ -103,7 +106,10 @@ class BigIntRange
         return $this->upperBound === ']' ? $this->upper : bcsub($this->upper, '1');
     }
 
-    public function contains(string $value): bool
+    /**
+     * @param string $value
+     */
+    public function contains(mixed $value): bool
     {
         if (! is_numeric($value)) {
             throw new InvalidArgumentException('Value must be a valid numeric string');
@@ -122,7 +128,7 @@ class BigIntRange
         return $lowerCheck && $upperCheck;
     }
 
-    public function overlap(self $range): bool
+    public function overlap(RangeInterface $range): bool
     {
         if ($this->isEmpty() || $range->isEmpty()) {
             return false;
@@ -155,16 +161,16 @@ class BigIntRange
 
         $diff = bcsub($upper, $lower);
 
-        $includeUpper = bcmod($diff, $this->step) === '0' ? '1' : '0';
+        $includeUpper = bcmod($diff, $this->getStep()) === '0' ? '1' : '0';
 
-        $length = bcadd(bcdiv($diff, $this->step, 0), $includeUpper);
+        $length = bcadd(bcdiv($diff, $this->getStep(), 0), $includeUpper);
 
         return $length;
     }
 
-    public function union(self $range): ?self
+    public function union(RangeInterface $range): ?RangeInterface
     {
-        if (bccomp($this->step, $range->step) !== 0) {
+        if (bccomp($this->getStep(), $range->getStep()) !== 0) {
             return null;
         }
 
@@ -185,12 +191,12 @@ class BigIntRange
             $upper = bccomp($thisUpper, $rangeUpper) >= 0 ? $thisUpper : $rangeUpper;
         }
 
-        return new self($lower, $upper, '[', ']', $this->step);
+        return new self($lower, $upper, '[', ']', $this->getStep());
     }
 
-    public function intersection(self $range): ?self
+    public function intersection(RangeInterface $range): ?RangeInterface
     {
-        if (bccomp($this->step, $range->step) !== 0) {
+        if (bccomp($this->getStep(), $range->getStep()) !== 0) {
             return null;
         }
 
@@ -219,7 +225,7 @@ class BigIntRange
             return null;
         }
 
-        return new self($lower, $upper, '[', ']', $this->step);
+        return new self($lower, $upper, '[', ']', $this->getStep());
     }
 
     /**
@@ -242,11 +248,11 @@ class BigIntRange
             return [];
         }
 
-        if (bccomp($upper, $lower) !== 0 && bccomp(bcsub($upper, $lower), $this->step) < 0) {
+        if (bccomp($upper, $lower) !== 0 && bccomp(bcsub($upper, $lower), $this->getStep()) < 0) {
             throw new InvalidStepToGenerateSeriesException();
         }
 
-        $estimatedSize = min(1000000, (int)bcadd(bcdiv(bcsub($upper, $lower), $this->step, 0), '1'));
+        $estimatedSize = min(1000000, (int) bcadd(bcdiv(bcsub($upper, $lower), $this->getStep(), 0), '1'));
         $series = [];
         $series = array_pad($series, $estimatedSize, null);
 
@@ -256,7 +262,7 @@ class BigIntRange
 
             while (bccomp($current, $upper) <= 0) {
                 $series[$count++] = $current;
-                $current = bcadd($current, $this->step);
+                $current = bcadd($current, $this->getStep());
 
                 if ($count > 1000000) {
                     throw new CantGenerateSeriesBecauseTheArrayIsTooLarge();
@@ -269,17 +275,18 @@ class BigIntRange
         }
     }
 
-    public function equals(self $range): bool
+    public function equals(RangeInterface $range): bool
     {
         return $this->getLowerBoundValue() === $range->getLowerBoundValue() &&
                $this->getUpperBoundValue() === $range->getUpperBoundValue() &&
-               $this->step === $range->step;
+               $this->getStep() === $range->getStep();
     }
 
     /**
+     * @param string $point
      * @return array<BigIntRange>
      */
-    public function split(string $point): array
+    public function split($point): array
     {
         if (! is_numeric($point)) {
             throw new InvalidArgumentException('Split point must be a valid numeric string');
@@ -294,7 +301,7 @@ class BigIntRange
             $point,
             $this->lowerBound,
             ')',
-            $this->step
+            $this->getStep()
         );
 
         $rightRange = new self(
@@ -302,7 +309,7 @@ class BigIntRange
             $this->upper,
             '[',
             $this->upperBound,
-            $this->step
+            $this->getStep()
         );
 
         return [$leftRange, $rightRange];
@@ -315,11 +322,14 @@ class BigIntRange
             $this->upper,
             $this->lowerBound,
             $this->upperBound,
-            $this->step
+            $this->getStep()
         );
     }
 
-    public function shift(string $offset): self
+    /**
+     * @param string $offset
+     */
+    public function shift($offset): self
     {
         if (! is_numeric($offset)) {
             throw new InvalidArgumentException('Offset must be a valid numeric string');
@@ -333,11 +343,14 @@ class BigIntRange
             $newUpper,
             $this->lowerBound,
             $this->upperBound,
-            $this->step
+            $this->getStep()
         );
     }
 
-    public function scale(string $factor): self
+    /**
+     * @param string $factor
+     */
+    public function scale($factor): self
     {
         if (! is_numeric($factor)) {
             throw new InvalidArgumentException('Factor must be a valid numeric string');
@@ -367,7 +380,12 @@ class BigIntRange
             $newUpper,
             $lowerBound,
             $upperBound,
-            bcmul($this->step, str_replace('-', '', $factor))
+            bcmul($this->getStep(), str_replace('-', '', $factor))
         );
+    }
+
+    public function getStep(): string
+    {
+        return $this->step;
     }
 }
