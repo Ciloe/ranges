@@ -1,0 +1,368 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Ciloe\Ranges;
+
+use Ciloe\Ranges\Exception\CantGenerateSeriesBecauseTheArrayIsTooLarge;
+use Ciloe\Ranges\Exception\InvalidBoundException;
+use Ciloe\Ranges\Exception\InvalidInfiniteBoundException;
+use Ciloe\Ranges\Exception\InvalidStepToGenerateSeriesException;
+use Exception;
+use InvalidArgumentException;
+
+class BigIntRange
+{
+    public function __construct(
+        readonly public ?string $lower = null,
+        readonly public ?string $upper = null,
+        readonly public string $lowerBound = '(',
+        readonly public string $upperBound = ')',
+        public string $step = '1',
+    ) {
+        // Validate that inputs are valid numeric strings
+        if ($lower !== null && ! is_numeric($lower)) {
+            throw new InvalidArgumentException('Lower bound must be a valid numeric string');
+        }
+        if ($upper !== null && ! is_numeric($upper)) {
+            throw new InvalidArgumentException('Upper bound must be a valid numeric string');
+        }
+        if (! is_numeric($step)) {
+            throw new InvalidArgumentException('Step must be a valid numeric string');
+        }
+        if (bccomp($step, '0') <= 0) {
+            throw new InvalidArgumentException('Step must be positive');
+        }
+    }
+
+    public function __toString(): string
+    {
+        $lowerValue = $this->lower === null ? '' : $this->lower;
+        $upperValue = $this->upper === null ? '' : $this->upper;
+
+        return $this->lowerBound . $lowerValue . ',' . $upperValue . $this->upperBound;
+    }
+
+    public static function fromString(string $range): self
+    {
+        if (! preg_match('/^(\[|\()(-?\d+|null)?,(-?\d+|null)?(\]|\))$/', $range, $matches)) {
+            throw new InvalidArgumentException('Invalid range format');
+        }
+
+        $lowerBound = $matches[1];
+        $lower = $matches[2] === 'null' || $matches[2] === '' ? null : $matches[2];
+        $upper = $matches[3] === 'null' || $matches[3] === '' ? null : $matches[3];
+        $upperBound = $matches[4];
+
+        if (($lower === null && $lowerBound === '[') || ($upper === null && $upperBound === ']')) {
+            throw new InvalidInfiniteBoundException();
+        }
+
+        $range = new self($lower, $upper, $lowerBound, $upperBound);
+
+        if (! $range->isBoundsValid()) {
+            throw new InvalidBoundException();
+        }
+
+        return $range;
+    }
+
+    public function isEmpty(): bool
+    {
+        return $this->lower === $this->upper &&
+            ($this->lowerBound === '(' || $this->upperBound === ')') &&
+            $this->lower !== null;
+    }
+
+    public function isBoundsValid(): bool
+    {
+        $lowerValue = $this->getLowerBoundValue();
+        $upperValue = $this->getUpperBoundValue();
+
+        if ($lowerValue === null || $upperValue === null) {
+            return true;
+        }
+
+        return bccomp($lowerValue, $upperValue) <= 0;
+    }
+
+    public function getLowerBoundValue(): ?string
+    {
+        if ($this->lower === null) {
+            return null;
+        }
+
+        return $this->lowerBound === '[' ? $this->lower : bcadd($this->lower, '1');
+    }
+
+    public function getUpperBoundValue(): ?string
+    {
+        if ($this->upper === null) {
+            return null;
+        }
+
+        return $this->upperBound === ']' ? $this->upper : bcsub($this->upper, '1');
+    }
+
+    public function contains(string $value): bool
+    {
+        if (! is_numeric($value)) {
+            throw new InvalidArgumentException('Value must be a valid numeric string');
+        }
+
+        $lower = $this->getLowerBoundValue();
+        $upper = $this->getUpperBoundValue();
+
+        $lowerCheck = $lower === null || bccomp($value, $lower) >= 0;
+        $upperCheck = $upper === null || bccomp($value, $upper) <= 0;
+
+        return $lowerCheck && $upperCheck;
+    }
+
+    public function overlap(self $range): bool
+    {
+        if ($this->isEmpty() || $range->isEmpty()) {
+            return false;
+        }
+
+        $a1 = $this->getLowerBoundValue();
+        $a2 = $this->getUpperBoundValue();
+        $b1 = $range->getLowerBoundValue();
+        $b2 = $range->getUpperBoundValue();
+
+        // If either range has null bounds, they overlap
+        if ($a1 === null || $a2 === null || $b1 === null || $b2 === null) {
+            return true;
+        }
+
+        return bccomp($a2, $b1) >= 0 && bccomp($b2, $a1) >= 0;
+    }
+
+    public function length(): ?string
+    {
+        $lower = $this->getLowerBoundValue();
+        $upper = $this->getUpperBoundValue();
+
+        if ($lower === null || $upper === null) {
+            return null;
+        }
+
+        // Calculate difference
+        $diff = bcsub($upper, $lower);
+
+        // Check if upper bound is included
+        $includeUpper = bcmod($diff, $this->step) === '0';
+
+        // Calculate length
+        $length = bcadd(bcdiv($diff, $this->step), $includeUpper ? '1' : '0');
+
+        return bccomp($length, '0') <= 0 ? '0' : $length;
+    }
+
+    public function union(self $range): ?self
+    {
+        if (bccomp($this->step, $range->step) !== 0) {
+            return null;
+        }
+
+        $thisLower = $this->getLowerBoundValue();
+        $rangeLower = $range->getLowerBoundValue();
+        $thisUpper = $this->getUpperBoundValue();
+        $rangeUpper = $range->getUpperBoundValue();
+
+        // Determine the lower bound of the union
+        if ($thisLower === null || $rangeLower === null) {
+            $lower = null;
+        } else {
+            $lower = bccomp($thisLower, $rangeLower) <= 0 ? $thisLower : $rangeLower;
+        }
+
+        // Determine the upper bound of the union
+        if ($thisUpper === null || $rangeUpper === null) {
+            $upper = null;
+        } else {
+            $upper = bccomp($thisUpper, $rangeUpper) >= 0 ? $thisUpper : $rangeUpper;
+        }
+
+        return new self($lower, $upper, '[', ']', $this->step);
+    }
+
+    public function intersection(self $range): ?self
+    {
+        if (bccomp($this->step, $range->step) !== 0) {
+            return null;
+        }
+
+        $thisLower = $this->getLowerBoundValue();
+        $rangeLower = $range->getLowerBoundValue();
+        $thisUpper = $this->getUpperBoundValue();
+        $rangeUpper = $range->getUpperBoundValue();
+
+        // Determine the lower bound of the intersection
+        if ($thisLower === null) {
+            $lower = $rangeLower;
+        } elseif ($rangeLower === null) {
+            $lower = $thisLower;
+        } else {
+            $lower = bccomp($thisLower, $rangeLower) >= 0 ? $thisLower : $rangeLower;
+        }
+
+        // Determine the upper bound of the intersection
+        if ($thisUpper === null) {
+            $upper = $rangeUpper;
+        } elseif ($rangeUpper === null) {
+            $upper = $thisUpper;
+        } else {
+            $upper = bccomp($thisUpper, $rangeUpper) <= 0 ? $thisUpper : $rangeUpper;
+        }
+
+        // Check if the intersection is empty
+        if ($lower !== null && $upper !== null && bccomp($lower, $upper) > 0) {
+            return null;
+        }
+
+        return new self($lower, $upper, '[', ']', $this->step);
+    }
+
+    /**
+     * @return string[]
+     */
+    public function generateSeries(): array
+    {
+        if ($this->isEmpty()) {
+            return [];
+        }
+
+        $lower = $this->getLowerBoundValue();
+        $upper = $this->getUpperBoundValue();
+
+        if ($lower === null || $upper === null) {
+            throw new CantGenerateSeriesBecauseTheArrayIsTooLarge();
+        }
+
+        if (bccomp($upper, $lower) !== 0 && bccomp(bcsub($upper, $lower), $this->step) < 0) {
+            throw new InvalidStepToGenerateSeriesException();
+        }
+
+        try {
+            $series = [];
+            $current = $lower;
+
+            while (bccomp($current, $upper) <= 0) {
+                $series[] = $current;
+                $current = bcadd($current, $this->step);
+
+                // Safety check to prevent infinite loops
+                if (count($series) > 1000000) {
+                    throw new CantGenerateSeriesBecauseTheArrayIsTooLarge();
+                }
+            }
+
+            return $series;
+        } catch (Exception $e) {
+            throw new CantGenerateSeriesBecauseTheArrayIsTooLarge($e);
+        }
+    }
+
+    public function equals(self $range): bool
+    {
+        return $this->getLowerBoundValue() === $range->getLowerBoundValue() &&
+               $this->getUpperBoundValue() === $range->getUpperBoundValue() &&
+               $this->step === $range->step;
+    }
+
+    /**
+     * @return array<BigIntRange>
+     */
+    public function split(string $point): array
+    {
+        if (! is_numeric($point)) {
+            throw new InvalidArgumentException('Split point must be a valid numeric string');
+        }
+
+        if (! $this->contains($point)) {
+            return [$this];
+        }
+
+        $leftRange = new self(
+            $this->lower,
+            $point,
+            $this->lowerBound,
+            ')',
+            $this->step
+        );
+
+        $rightRange = new self(
+            $point,
+            $this->upper,
+            '[',
+            $this->upperBound,
+            $this->step
+        );
+
+        return [$leftRange, $rightRange];
+    }
+
+    public function clone(): self
+    {
+        return new self(
+            $this->lower,
+            $this->upper,
+            $this->lowerBound,
+            $this->upperBound,
+            $this->step
+        );
+    }
+
+    public function shift(string $offset): self
+    {
+        if (! is_numeric($offset)) {
+            throw new InvalidArgumentException('Offset must be a valid numeric string');
+        }
+
+        $newLower = $this->lower === null ? null : bcadd($this->lower, $offset);
+        $newUpper = $this->upper === null ? null : bcadd($this->upper, $offset);
+
+        return new self(
+            $newLower,
+            $newUpper,
+            $this->lowerBound,
+            $this->upperBound,
+            $this->step
+        );
+    }
+
+    public function scale(string $factor): self
+    {
+        if (! is_numeric($factor)) {
+            throw new InvalidArgumentException('Factor must be a valid numeric string');
+        }
+
+        if (bccomp($factor, '0') === 0) {
+            throw new InvalidArgumentException('Scale factor cannot be zero');
+        }
+
+        $newLower = $this->lower === null ? null : bcmul($this->lower, $factor);
+        $newUpper = $this->upper === null ? null : bcmul($this->upper, $factor);
+
+        $lowerBound = $this->lowerBound;
+        $upperBound = $this->upperBound;
+
+        if (bccomp($factor, '0') < 0) {
+            $tempValue = $newLower;
+            $newLower = $newUpper;
+            $newUpper = $tempValue;
+
+            $lowerBound = $this->upperBound === ']' ? '[' : '(';
+            $upperBound = $this->lowerBound === '[' ? ']' : ')';
+        }
+
+        return new self(
+            $newLower,
+            $newUpper,
+            $lowerBound,
+            $upperBound,
+            bcmul($this->step, str_replace('-', '', $factor))
+        );
+    }
+}
