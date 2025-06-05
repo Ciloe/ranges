@@ -12,7 +12,7 @@ use Exception;
 use InvalidArgumentException;
 
 /**
- * @implements RangeInterface<int>
+ * @implements RangeInterface<int, int>
  */
 class IntRange implements RangeInterface
 {
@@ -103,6 +103,10 @@ class IntRange implements RangeInterface
 
     public function overlap(RangeInterface $range): bool
     {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of IntRange');
+        }
+
         if ($this->isEmpty() || $range->isEmpty()) {
             return false;
         }
@@ -134,6 +138,10 @@ class IntRange implements RangeInterface
 
     public function union(RangeInterface $range): ?self
     {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of IntRange');
+        }
+
         if ($this->getStep() !== $range->getStep()) {
             return null;
         }
@@ -148,6 +156,10 @@ class IntRange implements RangeInterface
 
     public function intersection(RangeInterface $range): ?self
     {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of IntRange');
+        }
+
         if ($this->getStep() !== $range->getStep()) {
             return null;
         }
@@ -195,6 +207,10 @@ class IntRange implements RangeInterface
 
     public function equals(RangeInterface $range): bool
     {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of IntRange');
+        }
+
         return $this->getLowerBoundValue() === $range->getLowerBoundValue() &&
                $this->getUpperBoundValue() === $range->getUpperBoundValue() &&
                $this->getStep() === $range->getStep();
@@ -206,6 +222,10 @@ class IntRange implements RangeInterface
      */
     public function split($point): array
     {
+        if (! is_int($point)) {
+            throw new InvalidArgumentException('Split point must be an integer');
+        }
+
         if (! $this->contains($point)) {
             return [$this];
         }
@@ -262,6 +282,10 @@ class IntRange implements RangeInterface
      */
     public function scale($factor): self
     {
+        if (! is_int($factor)) {
+            throw new InvalidArgumentException('Factor must be an integer');
+        }
+
         if ($factor === 0) {
             throw new InvalidArgumentException('Scale factor cannot be zero');
         }
