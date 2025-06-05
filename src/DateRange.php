@@ -9,7 +9,6 @@ use Ciloe\Ranges\Exception\InvalidBoundException;
 use Ciloe\Ranges\Exception\InvalidDateIntervalException;
 use Ciloe\Ranges\Exception\InvalidInfiniteBoundException;
 use DateInterval;
-use DateMalformedStringException;
 use DateTime;
 use DateTimeImmutable;
 use DateTimeInterface;
@@ -41,9 +40,6 @@ class DateRange implements RangeInterface
         return $this->lowerBound . $lowerValue . ',' . $upperValue . $this->upperBound;
     }
 
-    /**
-     * @throws DateMalformedStringException
-     */
     public static function fromString(string $range): self
     {
         if (
