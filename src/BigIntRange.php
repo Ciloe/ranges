@@ -12,7 +12,7 @@ use Exception;
 use InvalidArgumentException;
 
 /**
- * @implements RangeInterface<string>
+ * @implements RangeInterface<string, string>
  */
 class BigIntRange implements RangeInterface
 {
@@ -130,6 +130,10 @@ class BigIntRange implements RangeInterface
 
     public function overlap(RangeInterface $range): bool
     {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of BigIntRange');
+        }
+
         if ($this->isEmpty() || $range->isEmpty()) {
             return false;
         }
@@ -168,8 +172,12 @@ class BigIntRange implements RangeInterface
         return $length;
     }
 
-    public function union(RangeInterface $range): ?RangeInterface
+    public function union(RangeInterface $range): ?self
     {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of BigIntRange');
+        }
+
         if (bccomp($this->getStep(), $range->getStep()) !== 0) {
             return null;
         }
@@ -194,8 +202,12 @@ class BigIntRange implements RangeInterface
         return new self($lower, $upper, '[', ']', $this->getStep());
     }
 
-    public function intersection(RangeInterface $range): ?RangeInterface
+    public function intersection(RangeInterface $range): ?self
     {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of BigIntRange');
+        }
+
         if (bccomp($this->getStep(), $range->getStep()) !== 0) {
             return null;
         }
@@ -277,6 +289,10 @@ class BigIntRange implements RangeInterface
 
     public function equals(RangeInterface $range): bool
     {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of BigIntRange');
+        }
+
         return $this->getLowerBoundValue() === $range->getLowerBoundValue() &&
                $this->getUpperBoundValue() === $range->getUpperBoundValue() &&
                $this->getStep() === $range->getStep();

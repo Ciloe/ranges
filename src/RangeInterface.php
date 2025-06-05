@@ -12,6 +12,7 @@ use InvalidArgumentException;
 
 /**
  * @template T
+ * @template Y
  */
 interface RangeInterface
 {
@@ -23,7 +24,7 @@ interface RangeInterface
     /**
      * Will return an object representation of the range
      *
-     * @return RangeInterface<T> The range class
+     * @return RangeInterface<T, Y> The range class
      * @throws InvalidArgumentException If the range is invalid
      * @throws InvalidInfiniteBoundException When the includes bounds are used with infinite bounds
      * @throws InvalidBoundException When the upper bound is lower than the lower bound
@@ -49,14 +50,14 @@ interface RangeInterface
      *
      * @return T|null The lower bound value, or null if unbounded
      */
-    public function getLowerBoundValue();
+    public function getLowerBoundValue(): mixed;
 
     /**
      * Gets the effective upper bound value.
      *
      * @return T|null The upper bound value, or null if unbounded
      */
-    public function getUpperBoundValue();
+    public function getUpperBoundValue(): mixed;
 
     /**
      * Checks if the range contains a value.
@@ -70,8 +71,9 @@ interface RangeInterface
     /**
      * Checks if this range overlaps with another range.
      *
-     * @param RangeInterface<T> $range The range to check for overlap
+     * @param RangeInterface<T, Y> $range The range to check for overlap
      * @return bool True if the ranges overlap, false otherwise
+     * @throws InvalidArgumentException If the value is invalid
      */
     public function overlap(self $range): bool;
 
@@ -85,16 +87,18 @@ interface RangeInterface
     /**
      * Creates a union of this range with another range.
      *
-     * @param RangeInterface<T> $range The range to union with
-     * @return RangeInterface<T>|null The union range, or null if the ranges cannot be unioned
+     * @param RangeInterface<T, Y> $range The range to union with
+     * @return RangeInterface<T, Y>|null The union range, or null if the ranges cannot be unioned
+     * @throws InvalidArgumentException If the value is invalid
      */
     public function union(self $range): ?self;
 
     /**
      * Creates an intersection of this range with another range.
      *
-     * @param RangeInterface<T> $range The range to intersect with
-     * @return RangeInterface<T>|null The intersection range, or null if the ranges do not intersect
+     * @param RangeInterface<T, Y> $range The range to intersect with
+     * @return RangeInterface<T, Y>|null The intersection range, or null if the ranges do not intersect
+     * @throws InvalidArgumentException If the value is invalid
      */
     public function intersection(self $range): ?self;
 
@@ -110,8 +114,9 @@ interface RangeInterface
     /**
      * Checks if this range equals another range.
      *
-     * @param RangeInterface<T> $range The range to compare with
+     * @param RangeInterface<T, Y> $range The range to compare with
      * @return bool True if the ranges are equal, false otherwise
+     * @throws InvalidArgumentException If the value is invalid
      */
     public function equals(self $range): bool;
 
@@ -119,7 +124,7 @@ interface RangeInterface
      * Splits the range at a specific point.
      *
      * @param T $point The point to split at
-     * @return array<RangeInterface<T>> An array of ranges resulting from the split
+     * @return array<RangeInterface<T, Y>> An array of ranges resulting from the split
      * @throws InvalidArgumentException If the point is invalid
      */
     public function split(mixed $point): array;
@@ -127,15 +132,15 @@ interface RangeInterface
     /**
      * Creates a clone of this range.
      *
-     * @return RangeInterface<T> The cloned range
+     * @return RangeInterface<T, Y> The cloned range
      */
     public function clone(): self;
 
     /**
      * Creates a new range by shifting this range by an offset.
      *
-     * @param T $offset The offset to shift by
-     * @return RangeInterface<T> The shifted range
+     * @param Y $offset The offset to shift by
+     * @return RangeInterface<T, Y> The shifted range
      * @throws InvalidArgumentException If the offset is invalid
      */
     public function shift(mixed $offset): self;
@@ -143,8 +148,8 @@ interface RangeInterface
     /**
      * Creates a new range by scaling this range by a factor.
      *
-     * @param T $factor The factor to scale by
-     * @return RangeInterface<T> The scaled range
+     * @param Y $factor The factor to scale by
+     * @return RangeInterface<T, Y> The scaled range
      * @throws InvalidArgumentException If the factor is invalid
      */
     public function scale(mixed $factor): self;
@@ -152,7 +157,7 @@ interface RangeInterface
     /**
      * Gets the step value used for generating series and calculating length.
      *
-     * @return T The step value
+     * @return Y The step value
      */
     public function getStep(): mixed;
 }

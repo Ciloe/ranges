@@ -24,6 +24,14 @@ This class uses the BCMath extension for all operations, ensuring accurate calcu
 
 For detailed documentation on the BigIntRange class, see [BigIntRange Documentation](doc/BigIntRange.md).
 
+### DateRange
+
+The `DateRange` class allows you to represent and manipulate date ranges. It offers a complete API for creating, comparing, and transforming ranges of dates using DateTimeImmutable objects.
+
+This class supports custom step intervals (days, weeks, months, etc.) for generating date series and provides operations for date range manipulation.
+
+For detailed documentation on the DateRange class, see [DateRange Documentation](doc/DateRange.md).
+
 ## Quick Examples
 
 ### IntRange Example
@@ -62,6 +70,41 @@ $shifted = $range->shift('1000000000000000000');
 
 $scaled = $range->scale('2');
 // $scaled now represents [18446744073709551616, 18446744073709551636]
+```
+
+### DateRange Example
+
+```php
+use Ciloe\Ranges\DateRange;
+use DateTimeImmutable;
+use DateInterval;
+
+// Create a date range from 2023-01-01 to 2023-01-10
+$range = new DateRange(
+    new DateTimeImmutable('2023-01-01'),
+    new DateTimeImmutable('2023-01-10'),
+    '[',
+    ']'
+);
+
+// Check if a date is in the range
+$range->contains(new DateTimeImmutable('2023-01-05')); // true
+
+// Generate a series of dates in the range (with default 1-day step)
+$dates = $range->generateSeries(); // Array of DateTimeImmutable objects from 2023-01-01 to 2023-01-10
+
+// Create a range with weekly steps
+$weeklyRange = new DateRange(
+    new DateTimeImmutable('2023-01-01'),
+    new DateTimeImmutable('2023-01-31'),
+    '[',
+    ']',
+    new DateInterval('P1W')
+);
+$weeklyDates = $weeklyRange->generateSeries(); // [2023-01-01, 2023-01-08, 2023-01-15, 2023-01-22, 2023-01-29]
+
+// Shift a date range
+$shifted = $range->shift(new DateInterval('P1M')); // [2023-02-01, 2023-02-10]
 ```
 
 ## Exceptions
