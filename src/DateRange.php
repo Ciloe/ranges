@@ -6,9 +6,9 @@ namespace Ciloe\Ranges;
 
 use Ciloe\Ranges\Exception\CantGenerateSeriesBecauseTheArrayIsTooLarge;
 use Ciloe\Ranges\Exception\InvalidBoundException;
+use Ciloe\Ranges\Exception\InvalidDateIntervalException;
 use Ciloe\Ranges\Exception\InvalidInfiniteBoundException;
 use DateInterval;
-use DateMalformedStringException;
 use DateTime;
 use DateTimeImmutable;
 use DateTimeInterface;
@@ -19,6 +19,9 @@ use InvalidArgumentException;
  */
 class DateRange implements RangeInterface
 {
+    /**
+     * @throws InvalidDateIntervalException
+     */
     public function __construct(
         readonly public ?DateTimeImmutable $lower = null,
         readonly public ?DateTimeImmutable $upper = null,
@@ -26,6 +29,7 @@ class DateRange implements RangeInterface
         readonly public string $upperBound = ')',
         public DateInterval $step = new DateInterval('P1D'),
     ) {
+        $this->validateDateInterval($step);
     }
 
     public function __toString(): string
@@ -36,9 +40,6 @@ class DateRange implements RangeInterface
         return $this->lowerBound . $lowerValue . ',' . $upperValue . $this->upperBound;
     }
 
-    /**
-     * @throws DateMalformedStringException
-     */
     public static function fromString(string $range): self
     {
         if (
@@ -385,12 +386,15 @@ class DateRange implements RangeInterface
 
     /**
      * @param DateInterval $offset
+     * @throws InvalidDateIntervalException
      */
     public function shift(mixed $offset): self
     {
         if (! $offset instanceof DateInterval) {
             throw new InvalidArgumentException('Offset must be a DateInterval instance');
         }
+
+        $this->validateDateInterval($offset);
 
         $newLower = $this->lower?->add($offset);
         $newUpper = $this->upper?->add($offset);
@@ -415,6 +419,16 @@ class DateRange implements RangeInterface
     public function getStep(): DateInterval
     {
         return $this->step;
+    }
+
+    /**
+     * @throws InvalidDateIntervalException
+     */
+    private function validateDateInterval(DateInterval $interval): void
+    {
+        if ($interval->h !== 0 || $interval->i !== 0 || $interval->s !== 0 || $interval->f !== 0.0) {
+            throw new InvalidDateIntervalException();
+        }
     }
 
     private function getStepDays(): int

@@ -6,6 +6,7 @@ namespace Tests\Ciloe\Ranges;
 
 use Ciloe\Ranges\DateRange;
 use Ciloe\Ranges\Exception\InvalidBoundException;
+use Ciloe\Ranges\Exception\InvalidDateIntervalException;
 use Ciloe\Ranges\Exception\InvalidInfiniteBoundException;
 use DateInterval;
 use DateTimeImmutable;
@@ -338,5 +339,30 @@ class DateRangeTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
         $range->scale(2);
+    }
+
+    public function testInvalidDateIntervalInConstructor()
+    {
+        $this->expectException(InvalidDateIntervalException::class);
+        new DateRange(
+            new DateTimeImmutable('2025-06-04'),
+            new DateTimeImmutable('2025-06-07'),
+            '[',
+            ']',
+            new DateInterval('PT1H') // 1 hour
+        );
+    }
+
+    public function testInvalidDateIntervalInShift()
+    {
+        $range = new DateRange(
+            new DateTimeImmutable('2025-06-04'),
+            new DateTimeImmutable('2025-06-07'),
+            '[',
+            ']'
+        );
+
+        $this->expectException(InvalidDateIntervalException::class);
+        $range->shift(new DateInterval('PT30M')); // 30 minutes
     }
 }
