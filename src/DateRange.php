@@ -17,16 +17,16 @@ use InvalidArgumentException;
 /**
  * @implements RangeInterface<DateTimeImmutable, DateInterval>
  */
-class DateRange implements RangeInterface
+readonly class DateRange implements RangeInterface
 {
     /**
      * @throws InvalidDateIntervalException
      */
     public function __construct(
-        readonly public ?DateTimeImmutable $lower = null,
-        readonly public ?DateTimeImmutable $upper = null,
-        readonly public string $lowerBound = '(',
-        readonly public string $upperBound = ')',
+        public ?DateTimeImmutable $lower = null,
+        public ?DateTimeImmutable $upper = null,
+        public string $lowerBound = '(',
+        public string $upperBound = ')',
         public DateInterval $step = new DateInterval('P1D'),
     ) {
         $this->validateDateInterval($step);
@@ -79,15 +79,8 @@ class DateRange implements RangeInterface
             return false;
         }
 
-        $lowerValue = $this->getLowerBoundValue();
-        $upperValue = $this->getUpperBoundValue();
-
-        if ($lowerValue === null || $upperValue === null) {
-            return false;
-        }
-
-        return $lowerValue == $upperValue &&
-            ($this->lowerBound === '(' || $this->upperBound === ')');
+        return $this->lower == $this->upper &&
+            $this->lowerBound === '(' && $this->upperBound === ')';
     }
 
     public function isBoundsValid(): bool
@@ -178,6 +171,12 @@ class DateRange implements RangeInterface
         $b1 = $range->getLowerBoundValue();
         $b2 = $range->getUpperBoundValue();
 
+        if ($a1 === null && $a2 === null) {
+            return true;
+        }
+        if ($b1 === null && $b2 === null) {
+            return true;
+        }
         if ($a1 === null && $b2 === null) {
             return true;
         }
@@ -244,8 +243,17 @@ class DateRange implements RangeInterface
         $rangeLower = $range->getLowerBoundValue();
         $rangeUpper = $range->getUpperBoundValue();
 
-        $lower = $this->minDate($thisLower, $rangeLower);
-        $upper = $this->maxDate($thisUpper, $rangeUpper);
+        if ($thisLower === null || $rangeLower === null) {
+            $lower = null;
+        } else {
+            $lower = $this->minDate($thisLower, $rangeLower);
+        }
+
+        if ($thisUpper === null || $rangeUpper === null) {
+            $upper = null;
+        } else {
+            $upper = $this->maxDate($thisUpper, $rangeUpper);
+        }
 
         return new self($lower, $upper, '[', ']', $this->getStep());
     }
@@ -265,8 +273,21 @@ class DateRange implements RangeInterface
         $rangeLower = $range->getLowerBoundValue();
         $rangeUpper = $range->getUpperBoundValue();
 
-        $lower = $this->maxDate($thisLower, $rangeLower);
-        $upper = $this->minDate($thisUpper, $rangeUpper);
+        if ($thisLower === null) {
+            $lower = $rangeLower;
+        } elseif ($rangeLower === null) {
+            $lower = $thisLower;
+        } else {
+            $lower = $this->maxDate($thisLower, $rangeLower);
+        }
+
+        if ($thisUpper === null) {
+            $upper = $rangeUpper;
+        } elseif ($rangeUpper === null) {
+            $upper = $thisUpper;
+        } else {
+            $upper = $this->minDate($thisUpper, $rangeUpper);
+        }
 
         if ($lower !== null && $upper !== null && $lower > $upper) {
             return null;
@@ -449,6 +470,7 @@ class DateRange implements RangeInterface
         if ($date1 === null) {
             return $date2;
         }
+
         if ($date2 === null) {
             return $date1;
         }
@@ -461,6 +483,7 @@ class DateRange implements RangeInterface
         if ($date1 === null) {
             return $date1;
         }
+
         if ($date2 === null) {
             return $date2;
         }
