@@ -10,17 +10,18 @@ use Ciloe\Ranges\Exception\InvalidInfiniteBoundException;
 use Ciloe\Ranges\Exception\InvalidStepToGenerateSeriesException;
 use Exception;
 use InvalidArgumentException;
+use Override;
 
 /**
  * @implements RangeInterface<int, int>
  */
-class IntRange implements RangeInterface
+readonly class IntRange implements RangeInterface
 {
     public function __construct(
-        readonly public ?int $lower = null,
-        readonly public ?int $upper = null,
-        readonly public string $lowerBound = '(',
-        readonly public string $upperBound = ')',
+        public ?int $lower = null,
+        public ?int $upper = null,
+        public string $lowerBound = '(',
+        public string $upperBound = ')',
         public int $step = 1,
     ) {
         if ($step <= 0) {
@@ -28,6 +29,7 @@ class IntRange implements RangeInterface
         }
     }
 
+    #[Override]
     public function __toString(): string
     {
         $lowerValue = $this->lower === null ? '' : $this->lower;
@@ -36,6 +38,7 @@ class IntRange implements RangeInterface
         return $this->lowerBound . $lowerValue . ',' . $upperValue . $this->upperBound;
     }
 
+    #[Override]
     public static function fromString(string $range): self
     {
         if (! preg_match('/^(\[|\()(-?\d+|null)?,(-?\d+|null)?(\]|\))$/', $range, $matches)) {
@@ -60,23 +63,27 @@ class IntRange implements RangeInterface
         return $range;
     }
 
+    #[Override]
     public function isEmpty(): bool
     {
         return $this->lower === $this->upper &&
-            ($this->lowerBound === '(' || $this->upperBound === ')') &&
+            $this->lowerBound === '(' && $this->upperBound === ')' &&
             $this->lower !== null;
     }
 
+    #[Override]
     public function isBoundsValid(): bool
     {
         return ($this->getLowerBoundValue() ?? PHP_INT_MIN) <= ($this->getUpperBoundValue() ?? PHP_INT_MAX);
     }
 
+    #[Override]
     public function getLowerBoundValue(): ?int
     {
         return $this->lower === null ? null : ($this->lowerBound === '[' ? $this->lower : $this->lower + 1);
     }
 
+    #[Override]
     public function getUpperBoundValue(): ?int
     {
         return $this->upper === null ? null : ($this->upperBound === ']' ? $this->upper : $this->upper - 1);
@@ -85,6 +92,7 @@ class IntRange implements RangeInterface
     /**
      * @param int $value
      */
+    #[Override]
     public function contains(mixed $value): bool
     {
         if (! is_int($value)) {
@@ -101,6 +109,7 @@ class IntRange implements RangeInterface
         return $lower <= $value && $value <= $upper;
     }
 
+    #[Override]
     public function overlap(RangeInterface $range): bool
     {
         if (! $range instanceof self) {
@@ -119,6 +128,7 @@ class IntRange implements RangeInterface
         return $a2 >= $b1 && $b2 >= $a1;
     }
 
+    #[Override]
     public function length(): ?int
     {
         $lower = $this->getLowerBoundValue();
@@ -136,6 +146,7 @@ class IntRange implements RangeInterface
         return max($length, 0);
     }
 
+    #[Override]
     public function union(RangeInterface $range): ?self
     {
         if (! $range instanceof self) {
@@ -154,6 +165,7 @@ class IntRange implements RangeInterface
         return new self($lower, $upper, '[', ']');
     }
 
+    #[Override]
     public function intersection(RangeInterface $range): ?self
     {
         if (! $range instanceof self) {
@@ -177,6 +189,7 @@ class IntRange implements RangeInterface
     /**
      * @return int[]
      */
+    #[Override]
     public function generateSeries(): array
     {
         if ($this->isEmpty()) {
@@ -205,6 +218,7 @@ class IntRange implements RangeInterface
         }
     }
 
+    #[Override]
     public function equals(RangeInterface $range): bool
     {
         if (! $range instanceof self) {
@@ -220,6 +234,7 @@ class IntRange implements RangeInterface
      * @param int $point
      * @return array<IntRange>
      */
+    #[Override]
     public function split($point): array
     {
         if (! is_int($point)) {
@@ -249,6 +264,7 @@ class IntRange implements RangeInterface
         return [$leftRange, $rightRange];
     }
 
+    #[Override]
     public function clone(): self
     {
         return new self(
@@ -263,6 +279,7 @@ class IntRange implements RangeInterface
     /**
      * @param int $offset
      */
+    #[Override]
     public function shift($offset): self
     {
         $newLower = $this->lower === null ? null : $this->lower + $offset;
@@ -280,6 +297,7 @@ class IntRange implements RangeInterface
     /**
      * @param int $factor
      */
+    #[Override]
     public function scale($factor): self
     {
         if (! is_int($factor)) {
@@ -314,6 +332,7 @@ class IntRange implements RangeInterface
         );
     }
 
+    #[Override]
     public function getStep(): int
     {
         return $this->step;

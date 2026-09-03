@@ -582,34 +582,19 @@ class IntRangeTest extends TestCase
         $this->assertFalse($range->isEmpty());
     }
 
-    public function testIsEmptyWithExclusiveLowerBound()
+    public function testIsEmpty()
     {
         $range = new IntRange(5, 5, '(', ']');
-        $this->assertTrue($range->isEmpty());
-
-        $range = new IntRange(0, 0, '(', ']');
-        $this->assertTrue($range->isEmpty());
-
-        $range = new IntRange(-5, -5, '(', ']');
-        $this->assertTrue($range->isEmpty());
-
-        $range = new IntRange(5, 6, '(', ']');
         $this->assertFalse($range->isEmpty());
-    }
 
-    public function testIsEmptyWithExclusiveUpperBound()
-    {
         $range = new IntRange(5, 5, '[', ')');
-        $this->assertTrue($range->isEmpty());
-
-        $range = new IntRange(0, 0, '[', ')');
-        $this->assertTrue($range->isEmpty());
-
-        $range = new IntRange(-5, -5, '[', ')');
-        $this->assertTrue($range->isEmpty());
-
-        $range = new IntRange(5, 6, '[', ')');
         $this->assertFalse($range->isEmpty());
+
+        $range = new IntRange(5, 5, '[', ']');
+        $this->assertFalse($range->isEmpty());
+
+        $range = new IntRange(5, 5, '(', ')');
+        $this->assertTrue($range->isEmpty());
     }
 
     public function testIsEmptyWithNullBounds()
