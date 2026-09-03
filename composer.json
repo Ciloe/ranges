@@ -3,7 +3,9 @@
     "description": "A ranges representation library for PHP",
     "type": "library",
     "require": {
-        "php": "^8.2"
+        "php": "^8.3",
+        "ext-bcmath": "*",
+        "thecodingmachine/safe": "^3.4"
     },
     "require-dev": {
         "phpstan/phpstan": "^1.10",
@@ -40,14 +42,20 @@
         "validate": "composer validate --strict",
         "phpstan": "./bin/phpstan analyse --no-progress",
         "phpcs": "./bin/phpcs",
+        "phpcs-fix": "./bin/phpcbf",
         "ecs": "./bin/ecs check",
         "ecs-fix": "./bin/ecs check --fix",
         "phpunit": "./bin/phpunit tests",
         "ci": [
+            "@php -r \"echo PHP_EOL . '--- validate ---' . PHP_EOL;\"",
             "@validate",
+            "@php -r \"echo PHP_EOL . '--- phpstan ---' . PHP_EOL;\"",
             "@phpstan",
+            "@php -r \"echo PHP_EOL . '--- phpcs ---' . PHP_EOL;\"",
             "@phpcs",
+            "@php -r \"echo PHP_EOL . '--- ecs ---' . PHP_EOL;\"",
             "@ecs",
+            "@php -r \"echo PHP_EOL . '--- phpunit ---' . PHP_EOL;\"",
             "@phpunit"
         ]
     }

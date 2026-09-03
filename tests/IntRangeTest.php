@@ -7,7 +7,6 @@ namespace Tests\Ciloe\Ranges;
 use Ciloe\Ranges\Exception\CantGenerateSeriesBecauseTheArrayIsTooLarge;
 use Ciloe\Ranges\Exception\InvalidBoundException;
 use Ciloe\Ranges\Exception\InvalidInfiniteBoundException;
-use Ciloe\Ranges\Exception\InvalidStepToGenerateSeriesException;
 use Ciloe\Ranges\IntRange;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
@@ -195,6 +194,22 @@ class IntRangeTest extends TestCase
         } catch (InvalidBoundException $e) {
             $this->assertTrue(true);
         }
+    }
+
+    public function testExclusiveBoundsAreShiftedByStep()
+    {
+        $range = new IntRange(4, 20, '(', ']', 5);
+        $this->assertEquals(9, $range->getLowerBoundValue());
+        $this->assertEquals(20, $range->getUpperBoundValue());
+
+        $range = new IntRange(0, 20, '[', ')', 5);
+        $this->assertEquals(0, $range->getLowerBoundValue());
+        $this->assertEquals(15, $range->getUpperBoundValue());
+
+        $range = new IntRange(0, 20, '(', ')', 5);
+        $this->assertEquals(5, $range->getLowerBoundValue());
+        $this->assertEquals(15, $range->getUpperBoundValue());
+        $this->assertEquals([5, 10, 15], $range->generateSeries());
     }
 
     public function testContainsWithInclusiveBounds()
@@ -582,34 +597,19 @@ class IntRangeTest extends TestCase
         $this->assertFalse($range->isEmpty());
     }
 
-    public function testIsEmptyWithExclusiveLowerBound()
+    public function testIsEmpty()
     {
         $range = new IntRange(5, 5, '(', ']');
-        $this->assertTrue($range->isEmpty());
-
-        $range = new IntRange(0, 0, '(', ']');
-        $this->assertTrue($range->isEmpty());
-
-        $range = new IntRange(-5, -5, '(', ']');
-        $this->assertTrue($range->isEmpty());
-
-        $range = new IntRange(5, 6, '(', ']');
         $this->assertFalse($range->isEmpty());
-    }
 
-    public function testIsEmptyWithExclusiveUpperBound()
-    {
         $range = new IntRange(5, 5, '[', ')');
-        $this->assertTrue($range->isEmpty());
-
-        $range = new IntRange(0, 0, '[', ')');
-        $this->assertTrue($range->isEmpty());
-
-        $range = new IntRange(-5, -5, '[', ')');
-        $this->assertTrue($range->isEmpty());
-
-        $range = new IntRange(5, 6, '[', ')');
         $this->assertFalse($range->isEmpty());
+
+        $range = new IntRange(5, 5, '[', ']');
+        $this->assertFalse($range->isEmpty());
+
+        $range = new IntRange(5, 5, '(', ')');
+        $this->assertTrue($range->isEmpty());
     }
 
     public function testIsEmptyWithNullBounds()
@@ -792,6 +792,16 @@ class IntRangeTest extends TestCase
         $this->assertEquals(-2, $result->getUpperBoundValue());
     }
 
+    public function testUnionPreservesStep()
+    {
+        $range1 = new IntRange(0, 10, '[', ']', 2);
+        $range2 = new IntRange(5, 15, '[', ']', 2);
+        $result = $range1->union($range2);
+
+        $this->assertNotNull($result);
+        $this->assertEquals(2, $result->getStep());
+    }
+
     public function testUnionWithDifferentStep()
     {
         $range1 = new IntRange(5, 10, '[', ']', 1);
@@ -937,6 +947,16 @@ class IntRangeTest extends TestCase
         $this->assertEquals(-10, $result->getUpperBoundValue());
     }
 
+    public function testIntersectionPreservesStep()
+    {
+        $range1 = new IntRange(0, 10, '[', ']', 2);
+        $range2 = new IntRange(5, 15, '[', ']', 2);
+        $result = $range1->intersection($range2);
+
+        $this->assertNotNull($result);
+        $this->assertEquals(2, $result->getStep());
+    }
+
     public function testIntersectionWithDifferentStep()
     {
         $range1 = new IntRange(5, 15, '[', ']', 1);
@@ -1047,6 +1067,21 @@ class IntRangeTest extends TestCase
         $this->assertNotNull($result);
         $this->assertEquals(-10, $result->getLowerBoundValue());
         $this->assertEquals(10, $result->getUpperBoundValue());
+    }
+
+    public function testUnionAndIntersectionWithNullBoundsRoundTripThroughFromString()
+    {
+        $union = (new IntRange(null, 10, '(', ']'))->union(new IntRange(5, 15, '[', ']'));
+        $this->assertEquals('(,15]', (string) $union);
+        $this->assertTrue(IntRange::fromString((string) $union)->equals($union));
+
+        $union = (new IntRange(null, 10, '(', ']'))->union(new IntRange(5, null, '[', ')'));
+        $this->assertEquals('(,)', (string) $union);
+        $this->assertTrue(IntRange::fromString((string) $union)->equals($union));
+
+        $intersection = (new IntRange(null, 10, '(', ']'))->intersection(new IntRange(null, 5, '(', ']'));
+        $this->assertEquals('(,5]', (string) $intersection);
+        $this->assertTrue(IntRange::fromString((string) $intersection)->equals($intersection));
     }
 
     public function testIntersectionWithOneRangeInsideAnother()
@@ -1190,7 +1225,7 @@ class IntRangeTest extends TestCase
         $this->assertEquals([-5, -3, -1, 1, 3, 5], $range->generateSeries());
 
         $range = new IntRange(1, 10, '(', ')', 2);
-        $this->assertEquals([2, 4, 6, 8], $range->generateSeries());
+        $this->assertEquals([3, 5, 7], $range->generateSeries());
 
         $range = new IntRange(1, 10, '[', ')', 3);
         $this->assertEquals([1, 4, 7], $range->generateSeries());
@@ -1219,9 +1254,10 @@ class IntRangeTest extends TestCase
 
     public function testGenerateSeriesWithStepGreaterThanRange()
     {
-        $this->expectException(InvalidStepToGenerateSeriesException::class);
+        // Consistent with length(): the series contains at least the lower bound
         $range = new IntRange(1, 5, '[', ']', 10);
-        $range->generateSeries();
+        $this->assertEquals([1], $range->generateSeries());
+        $this->assertEquals(1, $range->length());
     }
 
     public function testGenerateSeriesWithSinglePointRange()

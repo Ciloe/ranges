@@ -7,7 +7,6 @@ namespace Ciloe\Ranges;
 use Ciloe\Ranges\Exception\CantGenerateSeriesBecauseTheArrayIsTooLarge;
 use Ciloe\Ranges\Exception\InvalidBoundException;
 use Ciloe\Ranges\Exception\InvalidInfiniteBoundException;
-use Ciloe\Ranges\Exception\InvalidStepToGenerateSeriesException;
 use InvalidArgumentException;
 
 /**
@@ -107,7 +106,6 @@ interface RangeInterface
      *
      * @return array<T> The series of values
      * @throws CantGenerateSeriesBecauseTheArrayIsTooLarge If the series is too large to generate
-     * @throws InvalidStepToGenerateSeriesException If the step is invalid for generating a series
      */
     public function generateSeries(): array;
 

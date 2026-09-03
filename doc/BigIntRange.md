@@ -5,13 +5,13 @@ The `BigIntRange` class allows you to represent and manipulate arbitrary precisi
 ## Class Definition
 
 ```php
-class BigIntRange
+readonly class BigIntRange implements RangeInterface
 {
     public function __construct(
-        readonly public ?string $lower = null,
-        readonly public ?string $upper = null,
-        readonly public string $lowerBound = '(',
-        readonly public string $upperBound = ')',
+        public ?string $lower = null,
+        public ?string $upper = null,
+        public string $lowerBound = '(',
+        public string $upperBound = ')',
         public string $step = '1',
     ) {}
 }
@@ -31,15 +31,17 @@ class BigIntRange
 
 ```php
 public function __construct(
-    readonly public ?string $lower = null,
-    readonly public ?string $upper = null,
-    readonly public string $lowerBound = '(',
-    readonly public string $upperBound = ')',
+    public ?string $lower = null,
+    public ?string $upper = null,
+    public string $lowerBound = '(',
+    public string $upperBound = ')',
     public string $step = '1',
 ) {}
 ```
 
 Creates a new BigIntRange instance. All numeric values are represented as strings to handle arbitrary precision integers.
+
+Throws an `InvalidArgumentException` if a bound or the step is not a valid numeric string, or if the step is not strictly positive.
 
 ### fromString
 
@@ -71,7 +73,7 @@ Checks if the bounds of the range are valid (lower <= upper).
 public function getLowerBoundValue(): ?string
 ```
 
-Gets the effective lower bound value, considering the bound type (inclusive/exclusive).
+Gets the effective lower bound value, considering the bound type (inclusive/exclusive). An exclusive bound is shifted by one step.
 
 ### getUpperBoundValue
 
@@ -79,7 +81,7 @@ Gets the effective lower bound value, considering the bound type (inclusive/excl
 public function getUpperBoundValue(): ?string
 ```
 
-Gets the effective upper bound value, considering the bound type (inclusive/exclusive).
+Gets the effective upper bound value, considering the bound type (inclusive/exclusive). An exclusive bound is shifted by one step.
 
 ### contains
 
@@ -100,10 +102,10 @@ Checks if this range overlaps with another range.
 ### length
 
 ```php
-public function length(): ?int
+public function length(): ?string
 ```
 
-Calculates the number of values in the range, considering the step. Returns null for infinite ranges.
+Calculates the number of values in the range, considering the step. The result is returned as a numeric string. Returns null for infinite ranges.
 
 ### union
 
@@ -151,7 +153,7 @@ Checks if this range is equal to another range.
 public function split(string $point): array
 ```
 
-Splits the range at a specific point, returning an array of two ranges.
+Splits the range at a specific point, returning an array of two ranges. If the point is outside the range, the original range is returned alone.
 
 ### clone
 
@@ -175,7 +177,7 @@ Creates a new range by shifting this range by the specified offset.
 public function scale(string $factor): self
 ```
 
-Creates a new range by scaling this range by the specified factor.
+Creates a new range by scaling the bounds and the step by the specified factor. Bounds are swapped when the factor is negative. Throws an `InvalidArgumentException` if the factor is zero or not numeric.
 
 ## Examples
 
@@ -202,4 +204,4 @@ $scaled = $range->scale('2');
 
 ## Requirements
 
-The BigIntRange class requires the BCMath extension to be enabled in your PHP installation.
+The BigIntRange class requires PHP 8.3 or higher and the BCMath extension to be enabled in your PHP installation.
