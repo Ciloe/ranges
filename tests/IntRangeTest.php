@@ -558,6 +558,172 @@ class IntRangeTest extends TestCase
         $this->assertFalse($range1->overlap($range2));
     }
 
+    public function testContainsRange()
+    {
+        $range = new IntRange(1, 10, '[', ']');
+
+        $this->assertTrue($range->containsRange(new IntRange(3, 5, '[', ']')));
+        $this->assertTrue($range->containsRange(new IntRange(1, 10, '[', ']')));
+        $this->assertFalse($range->containsRange(new IntRange(5, 15, '[', ']')));
+        $this->assertFalse($range->containsRange(new IntRange(0, 5, '[', ']')));
+        $this->assertFalse($range->containsRange(new IntRange(null, 5, '(', ']')));
+        $this->assertFalse($range->containsRange(new IntRange(5, null, '[', ')')));
+
+        // An empty range is contained in any range
+        $this->assertTrue($range->containsRange(new IntRange(5, 5, '(', ')')));
+
+        // An empty range contains nothing but an empty range
+        $empty = new IntRange(5, 5, '(', ')');
+        $this->assertFalse($empty->containsRange($range));
+        $this->assertTrue($empty->containsRange(new IntRange(3, 3, '(', ')')));
+
+        // Infinite ranges contain finite ones
+        $unbounded = new IntRange(null, 10, '(', ']');
+        $this->assertTrue($unbounded->containsRange(new IntRange(1, 5, '[', ']')));
+        $this->assertTrue($unbounded->containsRange(new IntRange(null, 5, '(', ']')));
+        $this->assertFalse($unbounded->containsRange(new IntRange(5, 15, '[', ']')));
+
+        $all = new IntRange(null, null, '(', ')');
+        $this->assertTrue($all->containsRange($range));
+        $this->assertTrue($all->containsRange($unbounded));
+    }
+
+    public function testIsBeforeAndIsAfter()
+    {
+        $range1 = new IntRange(1, 5, '[', ']');
+        $range2 = new IntRange(10, 20, '[', ']');
+
+        $this->assertTrue($range1->isBefore($range2));
+        $this->assertFalse($range2->isBefore($range1));
+        $this->assertTrue($range2->isAfter($range1));
+        $this->assertFalse($range1->isAfter($range2));
+
+        // Overlapping ranges are neither before nor after
+        $range3 = new IntRange(4, 12, '[', ']');
+        $this->assertFalse($range1->isBefore($range3));
+        $this->assertFalse($range1->isAfter($range3));
+        $this->assertFalse($range3->isBefore($range1));
+
+        // Touching ranges are not strictly before
+        $range4 = new IntRange(5, 10, '[', ']');
+        $this->assertFalse($range1->isBefore($range4));
+
+        // Infinite bounds
+        $this->assertFalse((new IntRange(null, 20, '(', ']'))->isBefore($range2));
+        $this->assertTrue((new IntRange(null, 5, '(', ']'))->isBefore($range2));
+        $this->assertFalse((new IntRange(1, null, '[', ')'))->isBefore($range2));
+
+        // Empty ranges are never before nor after
+        $empty = new IntRange(3, 3, '(', ')');
+        $this->assertFalse($empty->isBefore($range2));
+        $this->assertFalse($range2->isAfter($empty));
+    }
+
+    public function testIsAdjacent()
+    {
+        $range1 = new IntRange(1, 5, '[', ']');
+
+        $this->assertTrue($range1->isAdjacent(new IntRange(6, 10, '[', ']')));
+        $this->assertTrue((new IntRange(6, 10, '[', ']'))->isAdjacent($range1));
+        $this->assertFalse($range1->isAdjacent(new IntRange(7, 10, '[', ']')));
+        $this->assertFalse($range1->isAdjacent(new IntRange(5, 10, '[', ']')));
+
+        // Adjacency follows the step
+        $range = new IntRange(0, 10, '[', ']', 5);
+        $this->assertTrue($range->isAdjacent(new IntRange(15, 20, '[', ']', 5)));
+        $this->assertFalse($range->isAdjacent(new IntRange(11, 20, '[', ']', 5)));
+
+        // Different steps are never adjacent
+        $this->assertFalse($range1->isAdjacent(new IntRange(6, 10, '[', ']', 2)));
+
+        // Empty ranges are never adjacent
+        $empty = new IntRange(3, 3, '(', ')');
+        $this->assertFalse($empty->isAdjacent($range1));
+        $this->assertFalse($range1->isAdjacent($empty));
+
+        // Infinite touching sides are never adjacent
+        $this->assertFalse((new IntRange(null, 5, '(', ']'))->isAdjacent(new IntRange(null, 10, '(', ']')));
+    }
+
+    public function testDifference()
+    {
+        $range = new IntRange(1, 10, '[', ']');
+
+        // No overlap: the original range is returned
+        $result = $range->difference(new IntRange(15, 20, '[', ']'));
+        $this->assertCount(1, $result);
+        $this->assertEquals('[1,10]', (string) $result[0]);
+
+        // Subtracted range covers the left part
+        $result = $range->difference(new IntRange(1, 5, '[', ']'));
+        $this->assertCount(1, $result);
+        $this->assertEquals('[6,10]', (string) $result[0]);
+
+        // Subtracted range covers the right part
+        $result = $range->difference(new IntRange(8, 15, '[', ']'));
+        $this->assertCount(1, $result);
+        $this->assertEquals('[1,7]', (string) $result[0]);
+
+        // Subtracted range in the middle: two parts remain
+        $result = $range->difference(new IntRange(4, 6, '[', ']'));
+        $this->assertCount(2, $result);
+        $this->assertEquals('[1,3]', (string) $result[0]);
+        $this->assertEquals('[7,10]', (string) $result[1]);
+
+        // Subtracted range covers everything
+        $this->assertCount(0, $range->difference(new IntRange(0, 15, '[', ']')));
+
+        // Different steps: null
+        $this->assertNull($range->difference(new IntRange(4, 6, '[', ']', 2)));
+
+        // Null bounds
+        $result = (new IntRange(null, 10, '(', ']'))->difference(new IntRange(5, 15, '[', ']'));
+        $this->assertCount(1, $result);
+        $this->assertEquals('(,4]', (string) $result[0]);
+
+        $result = $range->difference(new IntRange(null, 5, '(', ']'));
+        $this->assertCount(1, $result);
+        $this->assertEquals('[6,10]', (string) $result[0]);
+
+        // The step is preserved
+        $result = (new IntRange(0, 20, '[', ']', 2))->difference(new IntRange(10, 14, '[', ']', 2));
+        $this->assertCount(2, $result);
+        $this->assertEquals(2, $result[0]->getStep());
+        $this->assertEquals('[0,8]', (string) $result[0]);
+        $this->assertEquals('[16,20]', (string) $result[1]);
+    }
+
+    public function testGap()
+    {
+        $range1 = new IntRange(1, 5, '[', ']');
+        $range2 = new IntRange(10, 20, '[', ']');
+
+        $gap = $range1->gap($range2);
+        $this->assertNotNull($gap);
+        $this->assertEquals('[6,9]', (string) $gap);
+
+        // Symmetric
+        $this->assertEquals('[6,9]', (string) $range2->gap($range1));
+
+        // Overlapping ranges have no gap
+        $this->assertNull($range1->gap(new IntRange(3, 8, '[', ']')));
+
+        // Adjacent ranges have no gap
+        $this->assertNull($range1->gap(new IntRange(6, 10, '[', ']')));
+
+        // Single-value gap
+        $gap = $range1->gap(new IntRange(7, 10, '[', ']'));
+        $this->assertEquals('[6,6]', (string) $gap);
+
+        // Different steps: null
+        $this->assertNull($range1->gap(new IntRange(10, 20, '[', ']', 2)));
+
+        // The step is preserved and drives the gap bounds
+        $gap = (new IntRange(0, 5, '[', ']', 5))->gap(new IntRange(20, 25, '[', ']', 5));
+        $this->assertEquals('[10,15]', (string) $gap);
+        $this->assertEquals(5, $gap->getStep());
+    }
+
     public function testIsEmptyWithEmptyRange()
     {
         $range = new IntRange(5, 5, '(', ')');
@@ -1294,6 +1460,158 @@ class IntRangeTest extends TestCase
 
         $range = new IntRange(-10, 10, '[', ']', 4);
         $this->assertEquals([-10, -6, -2, 2, 6, 10], $range->generateSeries());
+    }
+
+    public function testClamp()
+    {
+        $range = new IntRange(1, 10, '[', ']');
+        $this->assertEquals(1, $range->clamp(0));
+        $this->assertEquals(5, $range->clamp(5));
+        $this->assertEquals(10, $range->clamp(15));
+
+        // Effective bounds are used
+        $range = new IntRange(1, 10, '(', ')');
+        $this->assertEquals(2, $range->clamp(1));
+        $this->assertEquals(9, $range->clamp(10));
+
+        // Infinite bounds never clamp on their side
+        $range = new IntRange(null, 10, '(', ']');
+        $this->assertEquals(-999999, $range->clamp(-999999));
+        $this->assertEquals(10, $range->clamp(20));
+    }
+
+    public function testClampWithEmptyRange()
+    {
+        $range = new IntRange(5, 5, '(', ')');
+        $this->expectException(InvalidArgumentException::class);
+        $range->clamp(5);
+    }
+
+    public function testExpandAndShrink()
+    {
+        $range = new IntRange(5, 10, '[', ']');
+        $this->assertEquals('[3,12]', (string) $range->expand(2));
+        $this->assertEquals('[7,8]', (string) $range->shrink(2));
+
+        // Bound types and step are preserved
+        $range = new IntRange(5, 10, '(', ')', 2);
+        $expanded = $range->expand(2);
+        $this->assertEquals('(3,12)', (string) $expanded);
+        $this->assertEquals(2, $expanded->getStep());
+
+        // Infinite bounds are left untouched
+        $range = new IntRange(null, 10, '(', ']');
+        $this->assertEquals('(,12]', (string) $range->expand(2));
+        $this->assertEquals('(,8]', (string) $range->shrink(2));
+    }
+
+    public function testShrinkBeyondBoundsThrows()
+    {
+        $range = new IntRange(5, 7, '[', ']');
+        $this->expectException(InvalidBoundException::class);
+        $range->shrink(2);
+    }
+
+    public function testExpandWithNegativeAmountThrows()
+    {
+        $range = new IntRange(5, 10, '[', ']');
+        $this->expectException(InvalidArgumentException::class);
+        $range->expand(-2);
+    }
+
+    public function testRandom()
+    {
+        $range = new IntRange(1, 10, '[', ']', 3);
+        $series = $range->generateSeries();
+
+        for ($i = 0; $i < 10; $i++) {
+            $this->assertContains($range->random(), $series);
+        }
+
+        $range = new IntRange(5, 5, '[', ']');
+        $this->assertEquals(5, $range->random());
+    }
+
+    public function testRandomWithInfiniteBoundThrows()
+    {
+        $range = new IntRange(null, 10, '(', ']');
+        $this->expectException(InvalidArgumentException::class);
+        $range->random();
+    }
+
+    public function testIterate()
+    {
+        $range = new IntRange(1, 5, '[', ']', 2);
+        $this->assertEquals([1, 3, 5], iterator_to_array($range->iterate(), false));
+
+        $range = new IntRange(5, 5, '(', ')');
+        $this->assertEquals([], iterator_to_array($range->iterate(), false));
+
+        // Lazy: a huge range can be partially consumed without materializing it
+        $range = new IntRange(1, 1000000000, '[', ']');
+        $values = [];
+        foreach ($range->iterate() as $value) {
+            $values[] = $value;
+            if (count($values) === 3) {
+                break;
+            }
+        }
+        $this->assertEquals([1, 2, 3], $values);
+
+        // An infinite upper bound yields values lazily too
+        $range = new IntRange(5, null, '[', ')');
+        $values = [];
+        foreach ($range->iterate() as $value) {
+            $values[] = $value;
+            if (count($values) === 2) {
+                break;
+            }
+        }
+        $this->assertEquals([5, 6], $values);
+    }
+
+    public function testIterateWithInfiniteLowerBoundThrows()
+    {
+        $range = new IntRange(null, 10, '(', ']');
+        $this->expectException(InvalidArgumentException::class);
+        $range->iterate();
+    }
+
+    public function testChunk()
+    {
+        $range = new IntRange(1, 100, '[', ']');
+        $chunks = $range->chunk(30);
+        $this->assertCount(4, $chunks);
+        $this->assertEquals('[1,30]', (string) $chunks[0]);
+        $this->assertEquals('[31,60]', (string) $chunks[1]);
+        $this->assertEquals('[61,90]', (string) $chunks[2]);
+        $this->assertEquals('[91,100]', (string) $chunks[3]);
+
+        // The step drives the chunk boundaries and is preserved
+        $range = new IntRange(1, 10, '[', ']', 2);
+        $chunks = $range->chunk(3);
+        $this->assertCount(2, $chunks);
+        $this->assertEquals('[1,5]', (string) $chunks[0]);
+        $this->assertEquals('[7,10]', (string) $chunks[1]);
+        $this->assertEquals(2, $chunks[0]->getStep());
+
+        // An empty range yields no chunk
+        $range = new IntRange(5, 5, '(', ')');
+        $this->assertEquals([], $range->chunk(10));
+    }
+
+    public function testChunkWithInvalidCountThrows()
+    {
+        $range = new IntRange(1, 10, '[', ']');
+        $this->expectException(InvalidArgumentException::class);
+        $range->chunk(0);
+    }
+
+    public function testChunkWithInfiniteBoundThrows()
+    {
+        $range = new IntRange(1, null, '[', ')');
+        $this->expectException(InvalidArgumentException::class);
+        $range->chunk(10);
     }
 
     public function testToString()

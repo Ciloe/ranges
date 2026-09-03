@@ -13,6 +13,7 @@ use DateMalformedStringException;
 use DateTime;
 use DateTimeImmutable;
 use DateTimeInterface;
+use Generator;
 use InvalidArgumentException;
 use Override;
 
@@ -310,6 +311,181 @@ readonly class TimeRange implements RangeInterface
         return new self($lower, $upper, $lower === null ? '(' : '[', $upper === null ? ')' : ']', $this->getStep());
     }
 
+    #[Override]
+    public function containsRange(RangeInterface $range): bool
+    {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of TimeRange');
+        }
+
+        if ($range->isEmpty()) {
+            return true;
+        }
+
+        if ($this->isEmpty()) {
+            return false;
+        }
+
+        $thisLower = $this->getLowerBoundValue();
+        $thisUpper = $this->getUpperBoundValue();
+        $rangeLower = $range->getLowerBoundValue();
+        $rangeUpper = $range->getUpperBoundValue();
+
+        $lowerCheck = $thisLower === null ||
+            ($rangeLower !== null && $this->compareTimeOnly($rangeLower, $thisLower) >= 0);
+        $upperCheck = $thisUpper === null ||
+            ($rangeUpper !== null && $this->compareTimeOnly($rangeUpper, $thisUpper) <= 0);
+
+        return $lowerCheck && $upperCheck;
+    }
+
+    #[Override]
+    public function isBefore(RangeInterface $range): bool
+    {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of TimeRange');
+        }
+
+        if ($this->isEmpty() || $range->isEmpty()) {
+            return false;
+        }
+
+        $upper = $this->getUpperBoundValue();
+        $lower = $range->getLowerBoundValue();
+
+        return $upper !== null && $lower !== null && $this->compareTimeOnly($upper, $lower) < 0;
+    }
+
+    #[Override]
+    public function isAfter(RangeInterface $range): bool
+    {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of TimeRange');
+        }
+
+        return $range->isBefore($this);
+    }
+
+    #[Override]
+    public function isAdjacent(RangeInterface $range): bool
+    {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of TimeRange');
+        }
+
+        if (! $this->isSameStepUnit($range)) {
+            return false;
+        }
+
+        if ($this->isEmpty() || $range->isEmpty()) {
+            return false;
+        }
+
+        $thisLower = $this->getLowerBoundValue();
+        $thisUpper = $this->getUpperBoundValue();
+        $rangeLower = $range->getLowerBoundValue();
+        $rangeUpper = $range->getUpperBoundValue();
+
+        // Plain second arithmetic: a step crossing midnight never makes ranges adjacent
+        $touchesRight = $thisUpper !== null && $rangeLower !== null &&
+            $this->toSeconds($thisUpper) + $this->getStepSeconds() === $this->toSeconds($rangeLower);
+        $touchesLeft = $rangeUpper !== null && $thisLower !== null &&
+            $this->toSeconds($rangeUpper) + $this->getStepSeconds() === $this->toSeconds($thisLower);
+
+        return $touchesRight || $touchesLeft;
+    }
+
+    /**
+     * @return array<TimeRange>|null
+     */
+    #[Override]
+    public function difference(RangeInterface $range): ?array
+    {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of TimeRange');
+        }
+
+        if (! $this->isSameStepUnit($range)) {
+            return null;
+        }
+
+        if ($this->isEmpty()) {
+            return [];
+        }
+
+        if ($range->isEmpty() || ! $this->overlap($range)) {
+            return [$this->clone()];
+        }
+
+        $thisLower = $this->getLowerBoundValue();
+        $thisUpper = $this->getUpperBoundValue();
+        $rangeLower = $range->getLowerBoundValue();
+        $rangeUpper = $range->getUpperBoundValue();
+
+        $parts = [];
+
+        if ($rangeLower !== null && ($thisLower === null || $this->compareTimeOnly($thisLower, $rangeLower) < 0)) {
+            $parts[] = new self(
+                $thisLower,
+                $rangeLower->sub($this->getStep()),
+                $thisLower === null ? '(' : '[',
+                ']',
+                $this->getStep()
+            );
+        }
+
+        if ($rangeUpper !== null && ($thisUpper === null || $this->compareTimeOnly($thisUpper, $rangeUpper) > 0)) {
+            $parts[] = new self(
+                $rangeUpper->add($this->getStep()),
+                $thisUpper,
+                '[',
+                $thisUpper === null ? ')' : ']',
+                $this->getStep()
+            );
+        }
+
+        return $parts;
+    }
+
+    #[Override]
+    public function gap(RangeInterface $range): ?self
+    {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of TimeRange');
+        }
+
+        if (! $this->isSameStepUnit($range)) {
+            return null;
+        }
+
+        if ($this->overlap($range) || $this->isAdjacent($range)) {
+            return null;
+        }
+
+        if ($this->isBefore($range)) {
+            [$left, $right] = [$this, $range];
+        } elseif ($range->isBefore($this)) {
+            [$left, $right] = [$range, $this];
+        } else {
+            return null;
+        }
+
+        $leftUpper = $left->getUpperBoundValue();
+        $rightLower = $right->getLowerBoundValue();
+
+        if ($leftUpper === null || $rightLower === null) {
+            return null;
+        }
+
+        return new self(
+            $leftUpper->add($this->getStep()),
+            $rightLower->sub($this->getStep()),
+            '[',
+            ']',
+            $this->getStep()
+        );
+    }
+
     /**
      * @return DateTimeImmutable[]
      */
@@ -345,6 +521,164 @@ readonly class TimeRange implements RangeInterface
         }
 
         return $series;
+    }
+
+    /**
+     * @param DateTimeInterface $value
+     */
+    #[Override]
+    public function clamp(mixed $value): DateTimeImmutable
+    {
+        if (! $value instanceof DateTimeInterface) {
+            throw new InvalidArgumentException('Value must be a DateTimeInterface instance');
+        }
+
+        if ($this->isEmpty()) {
+            throw new InvalidArgumentException('Cannot clamp a value on an empty range');
+        }
+
+        if (! $value instanceof DateTimeImmutable) {
+            $value = DateTimeImmutable::createFromInterface($value);
+        }
+
+        $lower = $this->getLowerBoundValue();
+        $upper = $this->getUpperBoundValue();
+
+        if ($lower !== null && $this->compareTimeOnly($value, $lower) < 0) {
+            return $lower;
+        }
+
+        if ($upper !== null && $this->compareTimeOnly($value, $upper) > 0) {
+            return $upper;
+        }
+
+        return $value;
+    }
+
+    /**
+     * @param DateInterval $amount
+     * @throws InvalidTimeIntervalException
+     */
+    #[Override]
+    public function expand(mixed $amount): self
+    {
+        if (! $amount instanceof DateInterval) {
+            throw new InvalidArgumentException('Amount must be a DateInterval instance');
+        }
+
+        $this->validateStep($amount);
+
+        return new self(
+            $this->lower?->sub($amount),
+            $this->upper?->add($amount),
+            $this->lowerBound,
+            $this->upperBound,
+            $this->getStep()
+        );
+    }
+
+    /**
+     * @param DateInterval $amount
+     * @throws InvalidTimeIntervalException
+     */
+    #[Override]
+    public function shrink(mixed $amount): self
+    {
+        if (! $amount instanceof DateInterval) {
+            throw new InvalidArgumentException('Amount must be a DateInterval instance');
+        }
+
+        $this->validateStep($amount);
+
+        $shrunk = new self(
+            $this->lower?->add($amount),
+            $this->upper?->sub($amount),
+            $this->lowerBound,
+            $this->upperBound,
+            $this->getStep()
+        );
+
+        if (! $shrunk->isBoundsValid()) {
+            throw new InvalidBoundException();
+        }
+
+        return $shrunk;
+    }
+
+    #[Override]
+    public function random(): DateTimeImmutable
+    {
+        if ($this->isEmpty()) {
+            throw new InvalidArgumentException('Cannot pick a random value from an empty range');
+        }
+
+        $lower = $this->getLowerBoundValue();
+        $count = $this->length();
+
+        if ($lower === null || $count === null) {
+            throw new InvalidArgumentException('Cannot pick a random value from an infinite range');
+        }
+
+        $offsetSeconds = random_int(0, $count - 1) * $this->getStepSeconds();
+
+        return $lower->add(new DateInterval('PT' . $offsetSeconds . 'S'));
+    }
+
+    /**
+     * Both bounds must be finite: the time domain has no natural starting point for -∞.
+     *
+     * @return Generator<int, DateTimeImmutable>
+     */
+    #[Override]
+    public function iterate(): Generator
+    {
+        if (
+            ! $this->isEmpty() &&
+            ($this->getLowerBoundValue() === null || $this->getUpperBoundValue() === null)
+        ) {
+            throw new InvalidArgumentException('Cannot iterate over a range with an infinite bound');
+        }
+
+        return $this->iterateValues();
+    }
+
+    /**
+     * @return array<TimeRange>
+     */
+    #[Override]
+    public function chunk(int $count): array
+    {
+        if ($count <= 0) {
+            throw new InvalidArgumentException('Chunk size must be positive');
+        }
+
+        if ($this->isEmpty()) {
+            return [];
+        }
+
+        $lower = $this->getLowerBoundValue();
+        $upper = $this->getUpperBoundValue();
+
+        if ($lower === null || $upper === null) {
+            throw new InvalidArgumentException('Cannot chunk a range with an infinite bound');
+        }
+
+        $upperSeconds = $this->toSeconds($upper);
+        $chunkSpanSeconds = ($count - 1) * $this->getStepSeconds();
+        $chunks = [];
+        $start = $lower;
+        $startSeconds = $this->toSeconds($lower);
+
+        while ($startSeconds <= $upperSeconds) {
+            $endSeconds = min($startSeconds + $chunkSpanSeconds, $upperSeconds);
+            $end = $start->add(new DateInterval('PT' . ($endSeconds - $startSeconds) . 'S'));
+            $chunks[] = new self($start, $end, '[', ']', $this->getStep());
+
+            $startSeconds = $endSeconds + $this->getStepSeconds();
+            $start = $end->add($this->getStep());
+        }
+
+        return $chunks;
     }
 
     #[Override]
@@ -495,6 +829,38 @@ readonly class TimeRange implements RangeInterface
         if ($step->h === 0 && $step->i === 0 && $step->s === 0) {
             throw new InvalidTimeIntervalException();
         }
+    }
+
+    /**
+     * @return Generator<int, DateTimeImmutable>
+     */
+    private function iterateValues(): Generator
+    {
+        if ($this->isEmpty()) {
+            return;
+        }
+
+        $lower = $this->getLowerBoundValue();
+        $upper = $this->getUpperBoundValue();
+
+        if ($lower === null || $upper === null) {
+            return;
+        }
+
+        $upperSeconds = $this->toSeconds($upper);
+        $current = $lower;
+
+        // Iterate on seconds to guarantee termination when the step crosses midnight
+        for ($seconds = $this->toSeconds($lower); $seconds <= $upperSeconds; $seconds += $this->getStepSeconds()) {
+            yield $current;
+
+            $current = $current->add($this->getStep());
+        }
+    }
+
+    private function toSeconds(DateTimeInterface $time): int
+    {
+        return (int) $time->format('H') * 3600 + (int) $time->format('i') * 60 + (int) $time->format('s');
     }
 
     private function getStepSeconds(): int

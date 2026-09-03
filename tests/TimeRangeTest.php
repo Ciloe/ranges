@@ -328,6 +328,73 @@ class TimeRangeTest extends TestCase
         $this->assertNull($range1->intersection($range3));
     }
 
+    public function testContainsRange()
+    {
+        $referenceDate = new DateTimeImmutable('today');
+        $range = new TimeRange($referenceDate->setTime(9, 0, 0), $referenceDate->setTime(17, 0, 0), '[', ']');
+
+        $this->assertTrue($range->containsRange(
+            new TimeRange($referenceDate->setTime(10, 0, 0), $referenceDate->setTime(12, 0, 0), '[', ']')
+        ));
+        $this->assertFalse($range->containsRange(
+            new TimeRange($referenceDate->setTime(10, 0, 0), $referenceDate->setTime(18, 0, 0), '[', ']')
+        ));
+    }
+
+    public function testIsBeforeAndIsAfter()
+    {
+        $referenceDate = new DateTimeImmutable('today');
+        $morning = new TimeRange($referenceDate->setTime(9, 0, 0), $referenceDate->setTime(12, 0, 0), '[', ']');
+        $evening = new TimeRange($referenceDate->setTime(18, 0, 0), $referenceDate->setTime(22, 0, 0), '[', ']');
+
+        $this->assertTrue($morning->isBefore($evening));
+        $this->assertTrue($evening->isAfter($morning));
+        $this->assertFalse($morning->isAfter($evening));
+        $this->assertFalse($morning->isBefore(
+            new TimeRange($referenceDate->setTime(11, 0, 0), $referenceDate->setTime(13, 0, 0), '[', ']')
+        ));
+    }
+
+    public function testIsAdjacent()
+    {
+        $referenceDate = new DateTimeImmutable('today');
+        $range = new TimeRange($referenceDate->setTime(9, 0, 0), $referenceDate->setTime(11, 59, 59), '[', ']');
+
+        $this->assertTrue($range->isAdjacent(
+            new TimeRange($referenceDate->setTime(12, 0, 0), $referenceDate->setTime(14, 0, 0), '[', ']')
+        ));
+        $this->assertFalse($range->isAdjacent(
+            new TimeRange($referenceDate->setTime(12, 0, 1), $referenceDate->setTime(14, 0, 0), '[', ']')
+        ));
+    }
+
+    public function testDifference()
+    {
+        $referenceDate = new DateTimeImmutable('today');
+        $day = new TimeRange($referenceDate->setTime(9, 0, 0), $referenceDate->setTime(17, 0, 0), '[', ']');
+        $meeting = new TimeRange($referenceDate->setTime(11, 0, 0), $referenceDate->setTime(11, 59, 59), '[', ']');
+
+        $result = $day->difference($meeting);
+        $this->assertCount(2, $result);
+        $this->assertEquals('[09:00:00,10:59:59]', (string) $result[0]);
+        $this->assertEquals('[12:00:00,17:00:00]', (string) $result[1]);
+
+        $this->assertCount(0, $meeting->difference($day));
+    }
+
+    public function testGap()
+    {
+        $referenceDate = new DateTimeImmutable('today');
+        $morning = new TimeRange($referenceDate->setTime(9, 0, 0), $referenceDate->setTime(12, 0, 0), '[', ']');
+        $afternoon = new TimeRange($referenceDate->setTime(14, 0, 0), $referenceDate->setTime(18, 0, 0), '[', ']');
+
+        $this->assertEquals('[12:00:01,13:59:59]', (string) $morning->gap($afternoon));
+        $this->assertEquals('[12:00:01,13:59:59]', (string) $afternoon->gap($morning));
+        $this->assertNull($morning->gap(
+            new TimeRange($referenceDate->setTime(11, 0, 0), $referenceDate->setTime(13, 0, 0), '[', ']')
+        ));
+    }
+
     public function testSplit()
     {
         $referenceDate = new DateTimeImmutable('today');
@@ -344,6 +411,80 @@ class TimeRangeTest extends TestCase
         $this->assertEquals('20:59:59', $split[0]->getUpperBoundValue()->format('H:i:s'));
         $this->assertEquals('21:00:00', $split[1]->getLowerBoundValue()->format('H:i:s'));
         $this->assertEquals('22:00:00', $split[1]->getUpperBoundValue()->format('H:i:s'));
+    }
+
+    public function testClamp()
+    {
+        $referenceDate = new DateTimeImmutable('today');
+        $range = new TimeRange($referenceDate->setTime(9, 0, 0), $referenceDate->setTime(17, 0, 0), '[', ']');
+
+        $this->assertEquals('09:00:00', $range->clamp($referenceDate->setTime(6, 0, 0))->format('H:i:s'));
+        $this->assertEquals('12:30:00', $range->clamp($referenceDate->setTime(12, 30, 0))->format('H:i:s'));
+        $this->assertEquals('17:00:00', $range->clamp($referenceDate->setTime(20, 0, 0))->format('H:i:s'));
+    }
+
+    public function testExpandAndShrink()
+    {
+        $referenceDate = new DateTimeImmutable('today');
+        $range = new TimeRange($referenceDate->setTime(9, 0, 0), $referenceDate->setTime(17, 0, 0), '[', ']');
+
+        $this->assertEquals('[08:00:00,18:00:00]', (string) $range->expand(new DateInterval('PT1H')));
+        $this->assertEquals('[10:00:00,16:00:00]', (string) $range->shrink(new DateInterval('PT1H')));
+    }
+
+    public function testShrinkBeyondBoundsThrows()
+    {
+        $referenceDate = new DateTimeImmutable('today');
+        $range = new TimeRange($referenceDate->setTime(9, 0, 0), $referenceDate->setTime(10, 0, 0), '[', ']');
+        $this->expectException(InvalidBoundException::class);
+        $range->shrink(new DateInterval('PT2H'));
+    }
+
+    public function testRandom()
+    {
+        $referenceDate = new DateTimeImmutable('today');
+        $range = new TimeRange(
+            $referenceDate->setTime(9, 0, 0),
+            $referenceDate->setTime(10, 0, 0),
+            '[',
+            ']',
+            new DateInterval('PT15M')
+        );
+        $series = $range->generateSeries();
+
+        for ($i = 0; $i < 10; $i++) {
+            $this->assertContainsEquals($range->random(), $series);
+        }
+    }
+
+    public function testIterate()
+    {
+        $referenceDate = new DateTimeImmutable('today');
+        $range = new TimeRange($referenceDate->setTime(9, 0, 0), $referenceDate->setTime(9, 0, 4), '[', ']');
+
+        $times = iterator_to_array($range->iterate(), false);
+        $this->assertCount(5, $times);
+        $this->assertEquals('09:00:00', $times[0]->format('H:i:s'));
+        $this->assertEquals('09:00:04', $times[4]->format('H:i:s'));
+    }
+
+    public function testIterateWithInfiniteBoundThrows()
+    {
+        $referenceDate = new DateTimeImmutable('today');
+        $range = new TimeRange($referenceDate->setTime(9, 0, 0), null, '[', ')');
+        $this->expectException(InvalidArgumentException::class);
+        $range->iterate();
+    }
+
+    public function testChunk()
+    {
+        $referenceDate = new DateTimeImmutable('today');
+        $range = new TimeRange($referenceDate->setTime(9, 0, 0), $referenceDate->setTime(9, 59, 59), '[', ']');
+        $chunks = $range->chunk(1800);
+
+        $this->assertCount(2, $chunks);
+        $this->assertEquals('[09:00:00,09:29:59]', (string) $chunks[0]);
+        $this->assertEquals('[09:30:00,09:59:59]', (string) $chunks[1]);
     }
 
     public function testShift()

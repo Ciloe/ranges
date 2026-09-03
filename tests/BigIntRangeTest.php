@@ -375,6 +375,76 @@ class BigIntRangeTest extends TestCase
         $this->assertSame('10', $series[20]);
     }
 
+    public function testContainsRange(): void
+    {
+        $range = new BigIntRange('9223372036854775808', '9223372036854775900', '[', ']');
+
+        $inner = new BigIntRange('9223372036854775850', '9223372036854775860', '[', ']');
+        $this->assertTrue($range->containsRange($inner));
+
+        $partiallyOutside = new BigIntRange('9223372036854775850', '9223372036854775901', '[', ']');
+        $this->assertFalse($range->containsRange($partiallyOutside));
+
+        $unbounded = new BigIntRange(null, '10', '(', ']');
+        $this->assertTrue($unbounded->containsRange(new BigIntRange('-100', '5', '[', ']')));
+
+        $this->assertTrue($range->containsRange(new BigIntRange('5', '5', '(', ')')));
+    }
+
+    public function testIsBeforeAndIsAfter(): void
+    {
+        $range1 = new BigIntRange('1', '5', '[', ']');
+        $range2 = new BigIntRange('9223372036854775808', '9223372036854775900', '[', ']');
+
+        $this->assertTrue($range1->isBefore($range2));
+        $this->assertTrue($range2->isAfter($range1));
+        $this->assertFalse($range2->isBefore($range1));
+        $this->assertFalse($range1->isBefore(new BigIntRange('3', '8', '[', ']')));
+    }
+
+    public function testIsAdjacent(): void
+    {
+        $range = new BigIntRange('9223372036854775808', '9223372036854775810', '[', ']');
+
+        $this->assertTrue($range->isAdjacent(new BigIntRange('9223372036854775811', '9223372036854775820', '[', ']')));
+        $this->assertFalse($range->isAdjacent(new BigIntRange('9223372036854775812', '9223372036854775820', '[', ']')));
+
+        $differentStep = new BigIntRange('9223372036854775811', '9223372036854775820', '[', ']', '2');
+        $this->assertFalse($range->isAdjacent($differentStep));
+    }
+
+    public function testDifference(): void
+    {
+        $range = new BigIntRange('1', '10', '[', ']');
+
+        $result = $range->difference(new BigIntRange('4', '6', '[', ']'));
+        $this->assertCount(2, $result);
+        $this->assertSame('[1,3]', (string) $result[0]);
+        $this->assertSame('[7,10]', (string) $result[1]);
+
+        $result = $range->difference(new BigIntRange('1', '5', '[', ']'));
+        $this->assertCount(1, $result);
+        $this->assertSame('[6,10]', (string) $result[0]);
+
+        $this->assertCount(0, $range->difference(new BigIntRange('0', '15', '[', ']')));
+        $this->assertNull($range->difference(new BigIntRange('4', '6', '[', ']', '2')));
+
+        $result = (new BigIntRange(null, '10', '(', ']'))->difference(new BigIntRange('5', '15', '[', ']'));
+        $this->assertCount(1, $result);
+        $this->assertSame('(,4]', (string) $result[0]);
+    }
+
+    public function testGap(): void
+    {
+        $range1 = new BigIntRange('1', '5', '[', ']');
+        $range2 = new BigIntRange('10', '20', '[', ']');
+
+        $this->assertSame('[6,9]', (string) $range1->gap($range2));
+        $this->assertSame('[6,9]', (string) $range2->gap($range1));
+        $this->assertNull($range1->gap(new BigIntRange('3', '8', '[', ']')));
+        $this->assertNull($range1->gap(new BigIntRange('6', '10', '[', ']')));
+    }
+
     public function testIsEmptyWithEmptyRange(): void
     {
         $range = new BigIntRange('5', '5', '(', ')');
@@ -473,6 +543,68 @@ class BigIntRangeTest extends TestCase
 
         $this->assertNotSame($range, $cloned);
         $this->assertTrue($range->equals($cloned));
+    }
+
+    public function testClamp(): void
+    {
+        $range = new BigIntRange('9223372036854775808', '9223372036854775900', '[', ']');
+        $this->assertSame('9223372036854775808', $range->clamp('5'));
+        $this->assertSame('9223372036854775850', $range->clamp('9223372036854775850'));
+        $this->assertSame('9223372036854775900', $range->clamp('9999999999999999999'));
+    }
+
+    public function testExpandAndShrink(): void
+    {
+        $range = new BigIntRange('9223372036854775808', '9223372036854775900', '[', ']');
+        $this->assertSame('[9223372036854775806,9223372036854775902]', (string) $range->expand('2'));
+        $this->assertSame('[9223372036854775810,9223372036854775898]', (string) $range->shrink('2'));
+    }
+
+    public function testShrinkBeyondBoundsThrows(): void
+    {
+        $range = new BigIntRange('5', '7', '[', ']');
+        $this->expectException(InvalidBoundException::class);
+        $range->shrink('2');
+    }
+
+    public function testRandom(): void
+    {
+        $range = new BigIntRange('9223372036854775808', '9223372036854775818', '[', ']', '3');
+        $series = $range->generateSeries();
+
+        for ($i = 0; $i < 10; $i++) {
+            $this->assertContains($range->random(), $series);
+        }
+    }
+
+    public function testIterate(): void
+    {
+        $range = new BigIntRange('9223372036854775808', '9223372036854775812', '[', ']', '2');
+        $this->assertSame(
+            ['9223372036854775808', '9223372036854775810', '9223372036854775812'],
+            iterator_to_array($range->iterate(), false)
+        );
+
+        // An infinite upper bound yields values lazily
+        $range = new BigIntRange('9223372036854775808', null, '[', ')');
+        $values = [];
+        foreach ($range->iterate() as $value) {
+            $values[] = $value;
+            if (count($values) === 2) {
+                break;
+            }
+        }
+        $this->assertSame(['9223372036854775808', '9223372036854775809'], $values);
+    }
+
+    public function testChunk(): void
+    {
+        $range = new BigIntRange('1', '10', '[', ']');
+        $chunks = $range->chunk(4);
+        $this->assertCount(3, $chunks);
+        $this->assertSame('[1,4]', (string) $chunks[0]);
+        $this->assertSame('[5,8]', (string) $chunks[1]);
+        $this->assertSame('[9,10]', (string) $chunks[2]);
     }
 
     public function testToString(): void

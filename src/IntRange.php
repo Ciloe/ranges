@@ -8,6 +8,7 @@ use Ciloe\Ranges\Exception\CantGenerateSeriesBecauseTheArrayIsTooLarge;
 use Ciloe\Ranges\Exception\InvalidBoundException;
 use Ciloe\Ranges\Exception\InvalidInfiniteBoundException;
 use Exception;
+use Generator;
 use InvalidArgumentException;
 use Override;
 
@@ -202,6 +203,165 @@ readonly class IntRange implements RangeInterface
         );
     }
 
+    #[Override]
+    public function containsRange(RangeInterface $range): bool
+    {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of IntRange');
+        }
+
+        if ($range->isEmpty()) {
+            return true;
+        }
+
+        if ($this->isEmpty()) {
+            return false;
+        }
+
+        $lowerCheck = $this->getLowerBoundValue() === null ||
+            ($range->getLowerBoundValue() !== null && $range->getLowerBoundValue() >= $this->getLowerBoundValue());
+        $upperCheck = $this->getUpperBoundValue() === null ||
+            ($range->getUpperBoundValue() !== null && $range->getUpperBoundValue() <= $this->getUpperBoundValue());
+
+        return $lowerCheck && $upperCheck;
+    }
+
+    #[Override]
+    public function isBefore(RangeInterface $range): bool
+    {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of IntRange');
+        }
+
+        if ($this->isEmpty() || $range->isEmpty()) {
+            return false;
+        }
+
+        $upper = $this->getUpperBoundValue();
+        $lower = $range->getLowerBoundValue();
+
+        return $upper !== null && $lower !== null && $upper < $lower;
+    }
+
+    #[Override]
+    public function isAfter(RangeInterface $range): bool
+    {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of IntRange');
+        }
+
+        return $range->isBefore($this);
+    }
+
+    #[Override]
+    public function isAdjacent(RangeInterface $range): bool
+    {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of IntRange');
+        }
+
+        if ($this->getStep() !== $range->getStep()) {
+            return false;
+        }
+
+        if ($this->isEmpty() || $range->isEmpty()) {
+            return false;
+        }
+
+        $thisLower = $this->getLowerBoundValue();
+        $thisUpper = $this->getUpperBoundValue();
+        $rangeLower = $range->getLowerBoundValue();
+        $rangeUpper = $range->getUpperBoundValue();
+
+        return ($thisUpper !== null && $rangeLower !== null && $thisUpper + $this->getStep() === $rangeLower) ||
+            ($rangeUpper !== null && $thisLower !== null && $rangeUpper + $this->getStep() === $thisLower);
+    }
+
+    /**
+     * @return array<IntRange>|null
+     */
+    #[Override]
+    public function difference(RangeInterface $range): ?array
+    {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of IntRange');
+        }
+
+        if ($this->getStep() !== $range->getStep()) {
+            return null;
+        }
+
+        if ($this->isEmpty()) {
+            return [];
+        }
+
+        if ($range->isEmpty() || ! $this->overlap($range)) {
+            return [$this->clone()];
+        }
+
+        $thisLower = $this->getLowerBoundValue();
+        $thisUpper = $this->getUpperBoundValue();
+        $rangeLower = $range->getLowerBoundValue();
+        $rangeUpper = $range->getUpperBoundValue();
+
+        $parts = [];
+
+        if ($rangeLower !== null && ($thisLower === null || $thisLower < $rangeLower)) {
+            $parts[] = new self(
+                $thisLower,
+                $rangeLower - $this->getStep(),
+                $thisLower === null ? '(' : '[',
+                ']',
+                $this->getStep()
+            );
+        }
+
+        if ($rangeUpper !== null && ($thisUpper === null || $thisUpper > $rangeUpper)) {
+            $parts[] = new self(
+                $rangeUpper + $this->getStep(),
+                $thisUpper,
+                '[',
+                $thisUpper === null ? ')' : ']',
+                $this->getStep()
+            );
+        }
+
+        return $parts;
+    }
+
+    #[Override]
+    public function gap(RangeInterface $range): ?self
+    {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of IntRange');
+        }
+
+        if ($this->getStep() !== $range->getStep()) {
+            return null;
+        }
+
+        if ($this->overlap($range) || $this->isAdjacent($range)) {
+            return null;
+        }
+
+        if ($this->isBefore($range)) {
+            [$left, $right] = [$this, $range];
+        } elseif ($range->isBefore($this)) {
+            [$left, $right] = [$range, $this];
+        } else {
+            return null;
+        }
+
+        $leftUpper = $left->getUpperBoundValue();
+        $rightLower = $right->getLowerBoundValue();
+
+        if ($leftUpper === null || $rightLower === null) {
+            return null;
+        }
+
+        return new self($leftUpper + $this->getStep(), $rightLower - $this->getStep(), '[', ']', $this->getStep());
+    }
+
     /**
      * @return int[]
      */
@@ -233,6 +393,144 @@ readonly class IntRange implements RangeInterface
         } catch (Exception $e) {
             throw new CantGenerateSeriesBecauseTheArrayIsTooLarge($e);
         }
+    }
+
+    /**
+     * @param int $value
+     */
+    #[Override]
+    public function clamp(mixed $value): int
+    {
+        if (! is_int($value)) {
+            throw new InvalidArgumentException('Value must be an integer');
+        }
+
+        if ($this->isEmpty()) {
+            throw new InvalidArgumentException('Cannot clamp a value on an empty range');
+        }
+
+        $lower = $this->getLowerBoundValue();
+        $upper = $this->getUpperBoundValue();
+
+        if ($lower !== null && $value < $lower) {
+            return $lower;
+        }
+
+        if ($upper !== null && $value > $upper) {
+            return $upper;
+        }
+
+        return $value;
+    }
+
+    /**
+     * @param int $amount
+     */
+    #[Override]
+    public function expand(mixed $amount): self
+    {
+        $this->validateAmount($amount);
+
+        return new self(
+            $this->lower === null ? null : $this->lower - $amount,
+            $this->upper === null ? null : $this->upper + $amount,
+            $this->lowerBound,
+            $this->upperBound,
+            $this->getStep()
+        );
+    }
+
+    /**
+     * @param int $amount
+     */
+    #[Override]
+    public function shrink(mixed $amount): self
+    {
+        $this->validateAmount($amount);
+
+        $shrunk = new self(
+            $this->lower === null ? null : $this->lower + $amount,
+            $this->upper === null ? null : $this->upper - $amount,
+            $this->lowerBound,
+            $this->upperBound,
+            $this->getStep()
+        );
+
+        if (! $shrunk->isBoundsValid()) {
+            throw new InvalidBoundException();
+        }
+
+        return $shrunk;
+    }
+
+    #[Override]
+    public function random(): int
+    {
+        if ($this->isEmpty()) {
+            throw new InvalidArgumentException('Cannot pick a random value from an empty range');
+        }
+
+        $lower = $this->getLowerBoundValue();
+        $count = $this->length();
+
+        if ($lower === null || $count === null) {
+            throw new InvalidArgumentException('Cannot pick a random value from an infinite range');
+        }
+
+        return $lower + random_int(0, $count - 1) * $this->getStep();
+    }
+
+    /**
+     * The generator stops at the upper bound, or at PHP_INT_MAX when the upper bound is infinite.
+     *
+     * @return Generator<int, int>
+     */
+    #[Override]
+    public function iterate(): Generator
+    {
+        if (! $this->isEmpty() && $this->getLowerBoundValue() === null) {
+            throw new InvalidArgumentException('Cannot iterate over a range with an infinite lower bound');
+        }
+
+        return $this->iterateValues();
+    }
+
+    /**
+     * @return array<IntRange>
+     */
+    #[Override]
+    public function chunk(int $count): array
+    {
+        if ($count <= 0) {
+            throw new InvalidArgumentException('Chunk size must be positive');
+        }
+
+        if ($this->isEmpty()) {
+            return [];
+        }
+
+        $lower = $this->getLowerBoundValue();
+        $upper = $this->getUpperBoundValue();
+
+        if ($lower === null || $upper === null) {
+            throw new InvalidArgumentException('Cannot chunk a range with an infinite bound');
+        }
+
+        $chunks = [];
+        $start = $lower;
+
+        while ($start <= $upper) {
+            $end = min($start + ($count - 1) * $this->getStep(), $upper);
+            $chunks[] = new self($start, $end, '[', ']', $this->getStep());
+
+            if ($end > PHP_INT_MAX - $this->getStep()) {
+                break;
+            }
+
+            $start = $end + $this->getStep();
+        }
+
+        return $chunks;
     }
 
     #[Override]
@@ -353,5 +651,45 @@ readonly class IntRange implements RangeInterface
     public function getStep(): int
     {
         return $this->step;
+    }
+
+    private function validateAmount(mixed $amount): void
+    {
+        if (! is_int($amount)) {
+            throw new InvalidArgumentException('Amount must be an integer');
+        }
+
+        if ($amount < 0) {
+            throw new InvalidArgumentException('Amount must be positive');
+        }
+    }
+
+    /**
+     * @return Generator<int, int>
+     */
+    private function iterateValues(): Generator
+    {
+        if ($this->isEmpty()) {
+            return;
+        }
+
+        $lower = $this->getLowerBoundValue();
+        $upper = $this->getUpperBoundValue() ?? PHP_INT_MAX;
+
+        if ($lower === null) {
+            return;
+        }
+
+        $current = $lower;
+
+        while ($current <= $upper) {
+            yield $current;
+
+            if ($current > PHP_INT_MAX - $this->getStep()) {
+                break;
+            }
+
+            $current += $this->getStep();
+        }
     }
 }

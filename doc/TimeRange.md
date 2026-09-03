@@ -69,22 +69,32 @@ TimeRange::fromString('(,)');                  // Range (-∞,+∞)
 - `getLowerBoundValue()` : Returns the effective value of the lower bound
 - `getUpperBoundValue()` : Returns the effective value of the upper bound
 - `contains(DateTimeInterface $value)` : Checks if a time is in the range (date part ignored)
+- `containsRange(TimeRange $range)` : Checks if the range fully contains another range
 - `length()` : Calculates the number of values in the range, considering the step (null for infinite ranges)
+- `clamp(DateTimeInterface $value)` : Brings a time back within the effective bounds
+- `random()` : Picks a random time from the range, aligned on the step
 - `getStep()` : Returns the step interval
 
 ### Operations Between Ranges
 
 - `overlap(TimeRange $range)` : Checks if two ranges overlap
+- `isBefore(TimeRange $range)` / `isAfter(TimeRange $range)` : Checks if the range is strictly before/after another
+- `isAdjacent(TimeRange $range)` : Checks if two ranges touch within exactly one step, without overlapping
 - `union(TimeRange $range)` : Calculates the union of two ranges (returns null if the steps differ)
 - `intersection(TimeRange $range)` : Calculates the intersection of two ranges (returns null if the steps differ or the ranges do not intersect)
+- `difference(TimeRange $range)` : Subtracts a range, returning zero, one or two remaining ranges (null if the steps differ)
+- `gap(TimeRange $range)` : Returns the range between two disjoint ranges (null if they overlap, are adjacent, or the steps differ)
 - `equals(TimeRange $range)` : Checks if two ranges are equal (dates ignored, steps compared by their number of seconds)
 
 ### Transformations
 
 - `generateSeries()` : Generates an array of times in the range
+- `iterate()` : Lazily iterates over the times (a Generator; both bounds must be finite)
+- `chunk(int $count)` : Splits the range into consecutive sub-ranges of at most `$count` values
 - `split(DateTimeInterface $point)` : Divides the range into two at the specified time (returns the original range alone if the point is outside)
 - `clone()` : Creates a copy of the range
 - `shift(DateInterval $offset)` : Shifts the range by the specified time interval (the offset must not contain date components)
+- `expand(DateInterval $amount)` / `shrink(DateInterval $amount)` : Widens/narrows both bounds by the specified time-only interval
 - `scale(DateInterval $factor)` : Not supported, always throws an `InvalidArgumentException`
 - `__toString()` : Converts the range to a string
 

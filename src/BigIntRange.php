@@ -8,6 +8,7 @@ use Ciloe\Ranges\Exception\CantGenerateSeriesBecauseTheArrayIsTooLarge;
 use Ciloe\Ranges\Exception\InvalidBoundException;
 use Ciloe\Ranges\Exception\InvalidInfiniteBoundException;
 use Exception;
+use Generator;
 use InvalidArgumentException;
 use Override;
 
@@ -276,6 +277,178 @@ readonly class BigIntRange implements RangeInterface
         return new self($lower, $upper, $lower === null ? '(' : '[', $upper === null ? ')' : ']', $this->getStep());
     }
 
+    #[Override]
+    public function containsRange(RangeInterface $range): bool
+    {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of BigIntRange');
+        }
+
+        if ($range->isEmpty()) {
+            return true;
+        }
+
+        if ($this->isEmpty()) {
+            return false;
+        }
+
+        $thisLower = $this->getLowerBoundValue();
+        $thisUpper = $this->getUpperBoundValue();
+        $rangeLower = $range->getLowerBoundValue();
+        $rangeUpper = $range->getUpperBoundValue();
+
+        $lowerCheck = $thisLower === null || ($rangeLower !== null && bccomp($rangeLower, $thisLower) >= 0);
+        $upperCheck = $thisUpper === null || ($rangeUpper !== null && bccomp($rangeUpper, $thisUpper) <= 0);
+
+        return $lowerCheck && $upperCheck;
+    }
+
+    #[Override]
+    public function isBefore(RangeInterface $range): bool
+    {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of BigIntRange');
+        }
+
+        if ($this->isEmpty() || $range->isEmpty()) {
+            return false;
+        }
+
+        $upper = $this->getUpperBoundValue();
+        $lower = $range->getLowerBoundValue();
+
+        return $upper !== null && $lower !== null && bccomp($upper, $lower) < 0;
+    }
+
+    #[Override]
+    public function isAfter(RangeInterface $range): bool
+    {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of BigIntRange');
+        }
+
+        return $range->isBefore($this);
+    }
+
+    #[Override]
+    public function isAdjacent(RangeInterface $range): bool
+    {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of BigIntRange');
+        }
+
+        if (bccomp($this->getStep(), $range->getStep()) !== 0) {
+            return false;
+        }
+
+        if ($this->isEmpty() || $range->isEmpty()) {
+            return false;
+        }
+
+        $thisLower = $this->getLowerBoundValue();
+        $thisUpper = $this->getUpperBoundValue();
+        $rangeLower = $range->getLowerBoundValue();
+        $rangeUpper = $range->getUpperBoundValue();
+
+        $touchesRight = $thisUpper !== null && $rangeLower !== null &&
+            bccomp(bcadd($thisUpper, $this->getStep()), $rangeLower) === 0;
+        $touchesLeft = $rangeUpper !== null && $thisLower !== null &&
+            bccomp(bcadd($rangeUpper, $this->getStep()), $thisLower) === 0;
+
+        return $touchesRight || $touchesLeft;
+    }
+
+    /**
+     * @return array<BigIntRange>|null
+     */
+    #[Override]
+    public function difference(RangeInterface $range): ?array
+    {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of BigIntRange');
+        }
+
+        if (bccomp($this->getStep(), $range->getStep()) !== 0) {
+            return null;
+        }
+
+        if ($this->isEmpty()) {
+            return [];
+        }
+
+        if ($range->isEmpty() || ! $this->overlap($range)) {
+            return [$this->clone()];
+        }
+
+        $thisLower = $this->getLowerBoundValue();
+        $thisUpper = $this->getUpperBoundValue();
+        $rangeLower = $range->getLowerBoundValue();
+        $rangeUpper = $range->getUpperBoundValue();
+
+        $parts = [];
+
+        if ($rangeLower !== null && ($thisLower === null || bccomp($thisLower, $rangeLower) < 0)) {
+            $parts[] = new self(
+                $thisLower,
+                bcsub($rangeLower, $this->getStep()),
+                $thisLower === null ? '(' : '[',
+                ']',
+                $this->getStep()
+            );
+        }
+
+        if ($rangeUpper !== null && ($thisUpper === null || bccomp($thisUpper, $rangeUpper) > 0)) {
+            $parts[] = new self(
+                bcadd($rangeUpper, $this->getStep()),
+                $thisUpper,
+                '[',
+                $thisUpper === null ? ')' : ']',
+                $this->getStep()
+            );
+        }
+
+        return $parts;
+    }
+
+    #[Override]
+    public function gap(RangeInterface $range): ?self
+    {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of BigIntRange');
+        }
+
+        if (bccomp($this->getStep(), $range->getStep()) !== 0) {
+            return null;
+        }
+
+        if ($this->overlap($range) || $this->isAdjacent($range)) {
+            return null;
+        }
+
+        if ($this->isBefore($range)) {
+            [$left, $right] = [$this, $range];
+        } elseif ($range->isBefore($this)) {
+            [$left, $right] = [$range, $this];
+        } else {
+            return null;
+        }
+
+        $leftUpper = $left->getUpperBoundValue();
+        $rightLower = $right->getLowerBoundValue();
+
+        if ($leftUpper === null || $rightLower === null) {
+            return null;
+        }
+
+        return new self(
+            bcadd($leftUpper, $this->getStep()),
+            bcsub($rightLower, $this->getStep()),
+            '[',
+            ']',
+            $this->getStep()
+        );
+    }
+
     /**
      * @return string[]
      */
@@ -318,6 +491,147 @@ readonly class BigIntRange implements RangeInterface
         } catch (Exception $e) {
             throw new CantGenerateSeriesBecauseTheArrayIsTooLarge($e);
         }
+    }
+
+    /**
+     * @param string $value
+     */
+    #[Override]
+    public function clamp(mixed $value): string
+    {
+        if (! is_numeric($value)) {
+            throw new InvalidArgumentException('Value must be a valid numeric string');
+        }
+
+        if ($this->isEmpty()) {
+            throw new InvalidArgumentException('Cannot clamp a value on an empty range');
+        }
+
+        $lower = $this->getLowerBoundValue();
+        $upper = $this->getUpperBoundValue();
+
+        if ($lower !== null && bccomp($value, $lower) < 0) {
+            return $lower;
+        }
+
+        if ($upper !== null && bccomp($value, $upper) > 0) {
+            return $upper;
+        }
+
+        return $value;
+    }
+
+    /**
+     * @param string $amount
+     */
+    #[Override]
+    public function expand(mixed $amount): self
+    {
+        $this->validateAmount($amount);
+
+        return new self(
+            $this->lower === null ? null : bcsub($this->lower, $amount),
+            $this->upper === null ? null : bcadd($this->upper, $amount),
+            $this->lowerBound,
+            $this->upperBound,
+            $this->getStep()
+        );
+    }
+
+    /**
+     * @param string $amount
+     */
+    #[Override]
+    public function shrink(mixed $amount): self
+    {
+        $this->validateAmount($amount);
+
+        $shrunk = new self(
+            $this->lower === null ? null : bcadd($this->lower, $amount),
+            $this->upper === null ? null : bcsub($this->upper, $amount),
+            $this->lowerBound,
+            $this->upperBound,
+            $this->getStep()
+        );
+
+        if (! $shrunk->isBoundsValid()) {
+            throw new InvalidBoundException();
+        }
+
+        return $shrunk;
+    }
+
+    #[Override]
+    public function random(): string
+    {
+        if ($this->isEmpty()) {
+            throw new InvalidArgumentException('Cannot pick a random value from an empty range');
+        }
+
+        $lower = $this->getLowerBoundValue();
+        $count = $this->length();
+
+        if ($lower === null || $count === null) {
+            throw new InvalidArgumentException('Cannot pick a random value from an infinite range');
+        }
+
+        if (bccomp($count, (string) PHP_INT_MAX) > 0) {
+            throw new InvalidArgumentException('Range is too large to pick a random value from');
+        }
+
+        $index = random_int(0, (int) $count - 1);
+
+        return bcadd($lower, bcmul((string) $index, $this->getStep()));
+    }
+
+    /**
+     * The generator never stops when the upper bound is infinite.
+     *
+     * @return Generator<int, string>
+     */
+    #[Override]
+    public function iterate(): Generator
+    {
+        if (! $this->isEmpty() && $this->getLowerBoundValue() === null) {
+            throw new InvalidArgumentException('Cannot iterate over a range with an infinite lower bound');
+        }
+
+        return $this->iterateValues();
+    }
+
+    /**
+     * @return array<BigIntRange>
+     */
+    #[Override]
+    public function chunk(int $count): array
+    {
+        if ($count <= 0) {
+            throw new InvalidArgumentException('Chunk size must be positive');
+        }
+
+        if ($this->isEmpty()) {
+            return [];
+        }
+
+        $lower = $this->getLowerBoundValue();
+        $upper = $this->getUpperBoundValue();
+
+        if ($lower === null || $upper === null) {
+            throw new InvalidArgumentException('Cannot chunk a range with an infinite bound');
+        }
+
+        $chunkSpan = bcmul((string) ($count - 1), $this->getStep());
+        $chunks = [];
+        $start = $lower;
+
+        while (bccomp($start, $upper) <= 0) {
+            $candidate = bcadd($start, $chunkSpan);
+            $end = bccomp($candidate, $upper) > 0 ? $upper : $candidate;
+            $chunks[] = new self($start, $end, '[', ']', $this->getStep());
+            $start = bcadd($end, $this->getStep());
+        }
+
+        return $chunks;
     }
 
     #[Override]
@@ -442,5 +756,41 @@ readonly class BigIntRange implements RangeInterface
     public function getStep(): string
     {
         return $this->step;
+    }
+
+    private function validateAmount(mixed $amount): void
+    {
+        if (! is_numeric($amount) || ! is_string($amount)) {
+            throw new InvalidArgumentException('Amount must be a valid numeric string');
+        }
+
+        if (bccomp($amount, '0') < 0) {
+            throw new InvalidArgumentException('Amount must be positive');
+        }
+    }
+
+    /**
+     * @return Generator<int, string>
+     */
+    private function iterateValues(): Generator
+    {
+        if ($this->isEmpty()) {
+            return;
+        }
+
+        $lower = $this->getLowerBoundValue();
+        $upper = $this->getUpperBoundValue();
+
+        if ($lower === null) {
+            return;
+        }
+
+        $current = $lower;
+
+        while ($upper === null || bccomp($current, $upper) <= 0) {
+            yield $current;
+
+            $current = bcadd($current, $this->getStep());
+        }
     }
 }
