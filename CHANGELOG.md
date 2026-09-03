@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-09-03
+
+### Added
+- `RangeCollection` class: an immutable collection of same-type, same-step ranges with `merge()` (normalize into disjoint ranges), `gaps()` (free slots), `contains()` and `totalLength()`
+- Position predicates on all range types: `containsRange()`, `isBefore()`, `isAfter()`, `isAdjacent()`
+- Set operations on all range types: `difference()` (subtract a range, up to two parts remain) and `gap()` (the range between two disjoint ranges)
+- Value helpers on all range types: `clamp()`, `random()`, `expand()` and `shrink()`
+- `iterate()`: a lazy Generator counterpart to `generateSeries()` that handles huge or upper-unbounded ranges in constant memory
+- `chunk(int $count)`: splits a range into consecutive sub-ranges of at most `$count` values, for batch processing
+- `DateRange::fromMonth()`, `DateRange::fromYear()` and `DateRange::fromWeek()` factories
+- Documentation for RangeCollection (`doc/RangeCollection.md`) and for the new methods in every class documentation
+
 ## [1.0.0] - 2026-09-03
 
 ### Added

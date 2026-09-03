@@ -75,6 +75,48 @@ class DateRangeTest extends TestCase
         DateRange::fromString('[2025-06-07,2025-06-04]');
     }
 
+    public function testFromMonth()
+    {
+        $range = DateRange::fromMonth(2025, 6);
+        $this->assertEquals('[2025-06-01,2025-06-30]', (string) $range);
+
+        // Leap year February
+        $range = DateRange::fromMonth(2024, 2);
+        $this->assertEquals('[2024-02-01,2024-02-29]', (string) $range);
+
+        $range = DateRange::fromMonth(2025, 12);
+        $this->assertEquals('[2025-12-01,2025-12-31]', (string) $range);
+    }
+
+    public function testFromMonthWithInvalidMonthThrows()
+    {
+        $this->expectException(InvalidArgumentException::class);
+        DateRange::fromMonth(2025, 13);
+    }
+
+    public function testFromYear()
+    {
+        $range = DateRange::fromYear(2025);
+        $this->assertEquals('[2025-01-01,2025-12-31]', (string) $range);
+    }
+
+    public function testFromWeek()
+    {
+        // ISO week 1 of 2025 starts on Monday 2024-12-30
+        $range = DateRange::fromWeek(2025, 1);
+        $this->assertEquals('[2024-12-30,2025-01-05]', (string) $range);
+
+        $range = DateRange::fromWeek(2025, 23);
+        $this->assertEquals('[2025-06-02,2025-06-08]', (string) $range);
+    }
+
+    public function testFromWeekWithInvalidWeekThrows()
+    {
+        // 2025 has 52 ISO weeks
+        $this->expectException(InvalidArgumentException::class);
+        DateRange::fromWeek(2025, 53);
+    }
+
     public function testContainsWithInclusiveBounds()
     {
         $range = new DateRange(
@@ -840,6 +882,97 @@ class DateRangeTest extends TestCase
         $this->assertEquals(new DateTimeImmutable('2025-06-07'), $intersection->getUpperBoundValue());
     }
 
+    public function testContainsRange()
+    {
+        $range = new DateRange(new DateTimeImmutable('2025-06-01'), new DateTimeImmutable('2025-06-30'), '[', ']');
+
+        $this->assertTrue($range->containsRange(
+            new DateRange(new DateTimeImmutable('2025-06-10'), new DateTimeImmutable('2025-06-20'), '[', ']')
+        ));
+        $this->assertFalse($range->containsRange(
+            new DateRange(new DateTimeImmutable('2025-06-10'), new DateTimeImmutable('2025-07-05'), '[', ']')
+        ));
+        $this->assertTrue((new DateRange(null, null, '(', ')'))->containsRange($range));
+    }
+
+    public function testIsBeforeAndIsAfter()
+    {
+        $range1 = new DateRange(new DateTimeImmutable('2025-06-01'), new DateTimeImmutable('2025-06-10'), '[', ']');
+        $range2 = new DateRange(new DateTimeImmutable('2025-06-20'), new DateTimeImmutable('2025-06-30'), '[', ']');
+
+        $this->assertTrue($range1->isBefore($range2));
+        $this->assertTrue($range2->isAfter($range1));
+        $this->assertFalse($range1->isAfter($range2));
+        $this->assertFalse($range1->isBefore(
+            new DateRange(new DateTimeImmutable('2025-06-05'), new DateTimeImmutable('2025-06-15'), '[', ']')
+        ));
+    }
+
+    public function testIsAdjacent()
+    {
+        $range = new DateRange(new DateTimeImmutable('2025-06-01'), new DateTimeImmutable('2025-06-10'), '[', ']');
+
+        $this->assertTrue($range->isAdjacent(
+            new DateRange(new DateTimeImmutable('2025-06-11'), new DateTimeImmutable('2025-06-20'), '[', ']')
+        ));
+        $this->assertFalse($range->isAdjacent(
+            new DateRange(new DateTimeImmutable('2025-06-12'), new DateTimeImmutable('2025-06-20'), '[', ']')
+        ));
+
+        // Adjacency follows the step
+        $weekly = new DateRange(
+            new DateTimeImmutable('2025-06-01'),
+            new DateTimeImmutable('2025-06-08'),
+            '[',
+            ']',
+            new DateInterval('P7D')
+        );
+        $this->assertTrue($weekly->isAdjacent(new DateRange(
+            new DateTimeImmutable('2025-06-15'),
+            new DateTimeImmutable('2025-06-22'),
+            '[',
+            ']',
+            new DateInterval('P7D')
+        )));
+    }
+
+    public function testDifference()
+    {
+        $range = new DateRange(new DateTimeImmutable('2025-06-01'), new DateTimeImmutable('2025-06-30'), '[', ']');
+
+        $result = $range->difference(
+            new DateRange(new DateTimeImmutable('2025-06-10'), new DateTimeImmutable('2025-06-20'), '[', ']')
+        );
+        $this->assertCount(2, $result);
+        $this->assertEquals('[2025-06-01,2025-06-09]', (string) $result[0]);
+        $this->assertEquals('[2025-06-21,2025-06-30]', (string) $result[1]);
+
+        $result = $range->difference(
+            new DateRange(new DateTimeImmutable('2025-06-01'), new DateTimeImmutable('2025-06-15'), '[', ']')
+        );
+        $this->assertCount(1, $result);
+        $this->assertEquals('[2025-06-16,2025-06-30]', (string) $result[0]);
+
+        $this->assertCount(0, $range->difference(
+            new DateRange(new DateTimeImmutable('2025-05-01'), new DateTimeImmutable('2025-07-01'), '[', ']')
+        ));
+    }
+
+    public function testGap()
+    {
+        $range1 = new DateRange(new DateTimeImmutable('2025-06-01'), new DateTimeImmutable('2025-06-10'), '[', ']');
+        $range2 = new DateRange(new DateTimeImmutable('2025-06-20'), new DateTimeImmutable('2025-06-30'), '[', ']');
+
+        $this->assertEquals('[2025-06-11,2025-06-19]', (string) $range1->gap($range2));
+        $this->assertEquals('[2025-06-11,2025-06-19]', (string) $range2->gap($range1));
+        $this->assertNull($range1->gap(
+            new DateRange(new DateTimeImmutable('2025-06-05'), new DateTimeImmutable('2025-06-15'), '[', ']')
+        ));
+        $this->assertNull($range1->gap(
+            new DateRange(new DateTimeImmutable('2025-06-11'), new DateTimeImmutable('2025-06-20'), '[', ']')
+        ));
+    }
+
     public function testSplit()
     {
         $range = new DateRange(
@@ -912,6 +1045,91 @@ class DateRangeTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
         $range->split('2025-06-05');
+    }
+
+    public function testClamp()
+    {
+        $range = new DateRange(new DateTimeImmutable('2025-06-04'), new DateTimeImmutable('2025-06-07'), '[', ']');
+
+        $this->assertEquals(new DateTimeImmutable('2025-06-04'), $range->clamp(new DateTimeImmutable('2025-06-01')));
+        $this->assertEquals(new DateTimeImmutable('2025-06-05'), $range->clamp(new DateTimeImmutable('2025-06-05')));
+        $this->assertEquals(new DateTimeImmutable('2025-06-07'), $range->clamp(new DateTimeImmutable('2025-06-20')));
+    }
+
+    public function testExpandAndShrink()
+    {
+        $range = new DateRange(new DateTimeImmutable('2025-06-04'), new DateTimeImmutable('2025-06-07'), '[', ']');
+
+        $this->assertEquals('[2025-06-02,2025-06-09]', (string) $range->expand(new DateInterval('P2D')));
+        $this->assertEquals('[2025-06-05,2025-06-06]', (string) $range->shrink(new DateInterval('P1D')));
+    }
+
+    public function testShrinkBeyondBoundsThrows()
+    {
+        $range = new DateRange(new DateTimeImmutable('2025-06-04'), new DateTimeImmutable('2025-06-07'), '[', ']');
+        $this->expectException(InvalidBoundException::class);
+        $range->shrink(new DateInterval('P2D'));
+    }
+
+    public function testRandom()
+    {
+        $range = new DateRange(
+            new DateTimeImmutable('2025-06-01'),
+            new DateTimeImmutable('2025-06-30'),
+            '[',
+            ']',
+            new DateInterval('P7D')
+        );
+        $series = $range->generateSeries();
+
+        for ($i = 0; $i < 10; $i++) {
+            $this->assertContainsEquals($range->random(), $series);
+        }
+    }
+
+    public function testRandomWithInfiniteBoundThrows()
+    {
+        $range = new DateRange(null, new DateTimeImmutable('2025-06-30'), '(', ']');
+        $this->expectException(InvalidArgumentException::class);
+        $range->random();
+    }
+
+    public function testIterate()
+    {
+        $range = new DateRange(new DateTimeImmutable('2025-06-01'), new DateTimeImmutable('2025-06-05'), '[', ']');
+        $dates = iterator_to_array($range->iterate(), false);
+        $this->assertCount(5, $dates);
+        $this->assertEquals(new DateTimeImmutable('2025-06-01'), $dates[0]);
+        $this->assertEquals(new DateTimeImmutable('2025-06-05'), $dates[4]);
+
+        // An infinite upper bound yields values lazily
+        $range = new DateRange(new DateTimeImmutable('2025-06-01'), null, '[', ')');
+        $values = [];
+        foreach ($range->iterate() as $value) {
+            $values[] = $value;
+            if (count($values) === 2) {
+                break;
+            }
+        }
+        $this->assertEquals(new DateTimeImmutable('2025-06-02'), $values[1]);
+    }
+
+    public function testIterateWithInfiniteLowerBoundThrows()
+    {
+        $range = new DateRange(null, new DateTimeImmutable('2025-06-30'), '(', ']');
+        $this->expectException(InvalidArgumentException::class);
+        $range->iterate();
+    }
+
+    public function testChunk()
+    {
+        $range = new DateRange(new DateTimeImmutable('2025-06-01'), new DateTimeImmutable('2025-06-10'), '[', ']');
+        $chunks = $range->chunk(4);
+
+        $this->assertCount(3, $chunks);
+        $this->assertEquals('[2025-06-01,2025-06-04]', (string) $chunks[0]);
+        $this->assertEquals('[2025-06-05,2025-06-08]', (string) $chunks[1]);
+        $this->assertEquals('[2025-06-09,2025-06-10]', (string) $chunks[2]);
     }
 
     public function testShiftWithNullBounds()

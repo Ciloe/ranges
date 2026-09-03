@@ -52,6 +52,16 @@ new DateRange(
 
 The step must be a strictly positive date-only interval: an `InvalidDateIntervalException` is thrown if it contains time components (hours, minutes, seconds), if it is zero, or if it is negative/inverted.
 
+### Factories
+
+```php
+DateRange::fromMonth(2025, 6); // [2025-06-01,2025-06-30]
+DateRange::fromYear(2025);     // [2025-01-01,2025-12-31]
+DateRange::fromWeek(2025, 23); // [2025-06-02,2025-06-08] (ISO week, Monday to Sunday)
+```
+
+`fromMonth()` throws an `InvalidArgumentException` for a month outside 1-12, and `fromWeek()` for a week that does not exist in the given ISO year.
+
 ### From a String
 
 ```php
@@ -73,14 +83,21 @@ DateRange::fromString('(,)');                      // Range (-∞,+∞)
 - `getLowerBoundValue()` : Returns the effective value of the lower bound
 - `getUpperBoundValue()` : Returns the effective value of the upper bound
 - `contains(DateTimeInterface $value)` : Checks if a date is in the range (the time part of the value is ignored)
+- `containsRange(DateRange $range)` : Checks if the range fully contains another range
 - `length()` : Calculates the number of values in the range, considering the step (null for infinite ranges)
+- `clamp(DateTimeInterface $value)` : Brings a date back within the effective bounds
+- `random()` : Picks a random date from the range, aligned on the step
 - `getStep()` : Returns the step interval
 
 ### Operations Between Ranges
 
 - `overlap(DateRange $range)` : Checks if two ranges overlap
+- `isBefore(DateRange $range)` / `isAfter(DateRange $range)` : Checks if the range is strictly before/after another
+- `isAdjacent(DateRange $range)` : Checks if two ranges touch within exactly one step, without overlapping
 - `union(DateRange $range)` : Calculates the union of two ranges (returns null if the steps differ)
 - `intersection(DateRange $range)` : Calculates the intersection of two ranges (returns null if the steps differ or the ranges do not intersect)
+- `difference(DateRange $range)` : Subtracts a range, returning zero, one or two remaining ranges (null if the steps differ)
+- `gap(DateRange $range)` : Returns the range between two disjoint ranges (null if they overlap, are adjacent, or the steps differ)
 - `equals(DateRange $range)` : Checks if two ranges are equal (effective bounds and step)
 
 Steps are compared by their equivalent number of days, measured from a fixed reference date so the result does not depend on when the code runs.
@@ -88,9 +105,12 @@ Steps are compared by their equivalent number of days, measured from a fixed ref
 ### Transformations
 
 - `generateSeries()` : Generates an array of dates in the range
+- `iterate()` : Lazily iterates over the dates (a Generator; an infinite upper bound never stops)
+- `chunk(int $count)` : Splits the range into consecutive sub-ranges of at most `$count` values
 - `split(DateTimeInterface $point)` : Divides the range into two at the specified date (returns the original range alone if the point is outside)
 - `clone()` : Creates a copy of the range
 - `shift(DateInterval $offset)` : Shifts the range by the specified interval (the offset must not contain time components; an inverted interval shifts backwards)
+- `expand(DateInterval $amount)` / `shrink(DateInterval $amount)` : Widens/narrows both bounds by the specified date-only interval
 - `scale(DateInterval $factor)` : Not supported, always throws an `InvalidArgumentException`
 - `__toString()` : Converts the range to a string
 

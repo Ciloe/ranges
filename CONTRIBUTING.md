@@ -17,7 +17,8 @@ By participating in this project, you are expected to uphold our Code of Conduct
 
 ### Environment Requirements
 
-- PHP 8.2 or higher
+- PHP 8.3 or higher
+- The BCMath extension (`ext-bcmath`)
 - Composer
 
 ### Development Tools
@@ -36,6 +37,7 @@ The following Composer scripts are available:
 - `composer validate`: Validates composer.json
 - `composer phpstan`: Runs static analysis
 - `composer phpcs`: Runs PHP CodeSniffer
+- `composer phpcs-fix`: Runs PHP Code Beautifier with auto-fix
 - `composer ecs`: Runs Easy Coding Standard
 - `composer ecs-fix`: Runs Easy Coding Standard with auto-fix
 - `composer phpunit`: Runs tests
@@ -52,7 +54,7 @@ composer ecs-fix
 
 ## Testing
 
-All new features and bug fixes should include tests. Run the test suite with:
+All new features and bug fixes should include tests, written before the implementation. Every range type (`IntRange`, `BigIntRange`, `DateRange`, `TimeRange`) has its own implementation of the shared API, so a change to a shared behavior must be tested on each affected class. Run the test suite with:
 
 ```bash
 composer phpunit
@@ -69,7 +71,7 @@ Your pull request will be reviewed by the maintainers, who may request changes o
 
 ## Continuous Integration
 
-The project uses GitHub Actions for continuous integration. When you submit a pull request, the following checks will run automatically:
+The project uses GitHub Actions for continuous integration. When you submit a pull request, the following checks will run automatically on every supported PHP version (8.3 and 8.4):
 
 - Validation of composer.json
 - Static analysis with PHPStan
@@ -83,8 +85,9 @@ All checks must pass before a pull request can be merged.
 If you're adding new features or changing existing functionality, please update the relevant documentation:
 
 - Update the README.md if necessary
-- Update or add documentation in the doc/ directory
-- Add or update PHPDoc comments in the code
+- Update or add documentation in the doc/ directory (one file per range type, plus RangeCollection)
+- Add or update PHPDoc comments in the code, including the shared contract in `RangeInterface`
+- Add an entry to CHANGELOG.md under the unreleased version, following the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format; mark breaking changes explicitly
 
 ## License
 

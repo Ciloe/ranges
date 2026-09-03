@@ -13,6 +13,7 @@ use DateMalformedStringException;
 use DateTime;
 use DateTimeImmutable;
 use DateTimeInterface;
+use Generator;
 use InvalidArgumentException;
 use Override;
 
@@ -76,6 +77,56 @@ readonly class DateRange implements RangeInterface
         }
 
         return $range;
+    }
+
+    /**
+     * Creates the inclusive range covering a whole calendar month.
+     *
+     * @throws InvalidArgumentException If the month is not between 1 and 12
+     * @throws InvalidDateIntervalException
+     */
+    public static function fromMonth(int $year, int $month): self
+    {
+        if ($month < 1 || $month > 12) {
+            throw new InvalidArgumentException('Month must be between 1 and 12');
+        }
+
+        $firstDay = (new DateTimeImmutable())->setDate($year, $month, 1)->setTime(0, 0);
+
+        return new self($firstDay, $firstDay->modify('last day of this month'), '[', ']');
+    }
+
+    /**
+     * Creates the inclusive range covering a whole calendar year.
+     *
+     * @throws InvalidDateIntervalException
+     */
+    public static function fromYear(int $year): self
+    {
+        $firstDay = (new DateTimeImmutable())->setDate($year, 1, 1)->setTime(0, 0);
+
+        return new self($firstDay, $firstDay->setDate($year, 12, 31), '[', ']');
+    }
+
+    /**
+     * Creates the inclusive range covering a whole ISO week (Monday to Sunday).
+     *
+     * @throws InvalidArgumentException If the week does not exist in the given ISO year
+     * @throws InvalidDateIntervalException
+     */
+    public static function fromWeek(int $year, int $week): self
+    {
+        if ($week < 1 || $week > 53) {
+            throw new InvalidArgumentException('Week must be between 1 and 53');
+        }
+
+        $monday = (new DateTimeImmutable())->setISODate($year, $week)->setTime(0, 0);
+
+        if ($monday->format('o-W') !== sprintf('%04d-%02d', $year, $week)) {
+            throw new InvalidArgumentException(sprintf('Week %d does not exist in ISO year %d', $week, $year));
+        }
+
+        return new self($monday, $monday->modify('+6 days'), '[', ']');
     }
 
     #[Override]
@@ -310,6 +361,180 @@ readonly class DateRange implements RangeInterface
         return new self($lower, $upper, $lower === null ? '(' : '[', $upper === null ? ')' : ']', $this->getStep());
     }
 
+    #[Override]
+    public function containsRange(RangeInterface $range): bool
+    {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of DateRange');
+        }
+
+        if ($range->isEmpty()) {
+            return true;
+        }
+
+        if ($this->isEmpty()) {
+            return false;
+        }
+
+        $thisLower = $this->getLowerBoundValue();
+        $thisUpper = $this->getUpperBoundValue();
+        $rangeLower = $range->getLowerBoundValue();
+        $rangeUpper = $range->getUpperBoundValue();
+
+        $lowerCheck = $thisLower === null ||
+            ($rangeLower !== null && $this->compareDateOnly($rangeLower, $thisLower) >= 0);
+        $upperCheck = $thisUpper === null ||
+            ($rangeUpper !== null && $this->compareDateOnly($rangeUpper, $thisUpper) <= 0);
+
+        return $lowerCheck && $upperCheck;
+    }
+
+    #[Override]
+    public function isBefore(RangeInterface $range): bool
+    {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of DateRange');
+        }
+
+        if ($this->isEmpty() || $range->isEmpty()) {
+            return false;
+        }
+
+        $upper = $this->getUpperBoundValue();
+        $lower = $range->getLowerBoundValue();
+
+        return $upper !== null && $lower !== null && $this->compareDateOnly($upper, $lower) < 0;
+    }
+
+    #[Override]
+    public function isAfter(RangeInterface $range): bool
+    {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of DateRange');
+        }
+
+        return $range->isBefore($this);
+    }
+
+    #[Override]
+    public function isAdjacent(RangeInterface $range): bool
+    {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of DateRange');
+        }
+
+        if (! $this->isSameStepUnit($range)) {
+            return false;
+        }
+
+        if ($this->isEmpty() || $range->isEmpty()) {
+            return false;
+        }
+
+        $thisLower = $this->getLowerBoundValue();
+        $thisUpper = $this->getUpperBoundValue();
+        $rangeLower = $range->getLowerBoundValue();
+        $rangeUpper = $range->getUpperBoundValue();
+
+        $touchesRight = $thisUpper !== null && $rangeLower !== null &&
+            $this->compareDateOnly($thisUpper->add($this->getStep()), $rangeLower) === 0;
+        $touchesLeft = $rangeUpper !== null && $thisLower !== null &&
+            $this->compareDateOnly($rangeUpper->add($this->getStep()), $thisLower) === 0;
+
+        return $touchesRight || $touchesLeft;
+    }
+
+    /**
+     * @return array<DateRange>|null
+     */
+    #[Override]
+    public function difference(RangeInterface $range): ?array
+    {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of DateRange');
+        }
+
+        if (! $this->isSameStepUnit($range)) {
+            return null;
+        }
+
+        if ($this->isEmpty()) {
+            return [];
+        }
+
+        if ($range->isEmpty() || ! $this->overlap($range)) {
+            return [$this->clone()];
+        }
+
+        $thisLower = $this->getLowerBoundValue();
+        $thisUpper = $this->getUpperBoundValue();
+        $rangeLower = $range->getLowerBoundValue();
+        $rangeUpper = $range->getUpperBoundValue();
+
+        $parts = [];
+
+        if ($rangeLower !== null && ($thisLower === null || $this->compareDateOnly($thisLower, $rangeLower) < 0)) {
+            $parts[] = new self(
+                $thisLower,
+                $rangeLower->sub($this->getStep()),
+                $thisLower === null ? '(' : '[',
+                ']',
+                $this->getStep()
+            );
+        }
+
+        if ($rangeUpper !== null && ($thisUpper === null || $this->compareDateOnly($thisUpper, $rangeUpper) > 0)) {
+            $parts[] = new self(
+                $rangeUpper->add($this->getStep()),
+                $thisUpper,
+                '[',
+                $thisUpper === null ? ')' : ']',
+                $this->getStep()
+            );
+        }
+
+        return $parts;
+    }
+
+    #[Override]
+    public function gap(RangeInterface $range): ?self
+    {
+        if (! $range instanceof self) {
+            throw new InvalidArgumentException('Range must be an instance of DateRange');
+        }
+
+        if (! $this->isSameStepUnit($range)) {
+            return null;
+        }
+
+        if ($this->overlap($range) || $this->isAdjacent($range)) {
+            return null;
+        }
+
+        if ($this->isBefore($range)) {
+            [$left, $right] = [$this, $range];
+        } elseif ($range->isBefore($this)) {
+            [$left, $right] = [$range, $this];
+        } else {
+            return null;
+        }
+
+        $leftUpper = $left->getUpperBoundValue();
+        $rightLower = $right->getLowerBoundValue();
+
+        if ($leftUpper === null || $rightLower === null) {
+            return null;
+        }
+
+        return new self(
+            $leftUpper->add($this->getStep()),
+            $rightLower->sub($this->getStep()),
+            '[',
+            ']',
+            $this->getStep()
+        );
+    }
+
     /**
      * @return DateTimeImmutable[]
      */
@@ -340,6 +565,154 @@ readonly class DateRange implements RangeInterface
         }
 
         return $series;
+    }
+
+    /**
+     * @param DateTimeInterface $value
+     */
+    #[Override]
+    public function clamp(mixed $value): DateTimeImmutable
+    {
+        if (! $value instanceof DateTimeInterface) {
+            throw new InvalidArgumentException('Value must be a DateTimeInterface instance');
+        }
+
+        if ($this->isEmpty()) {
+            throw new InvalidArgumentException('Cannot clamp a value on an empty range');
+        }
+
+        if (! $value instanceof DateTimeImmutable) {
+            $value = DateTimeImmutable::createFromInterface($value);
+        }
+
+        $lower = $this->getLowerBoundValue();
+        $upper = $this->getUpperBoundValue();
+
+        if ($lower !== null && $this->compareDateOnly($value, $lower) < 0) {
+            return $lower;
+        }
+
+        if ($upper !== null && $this->compareDateOnly($value, $upper) > 0) {
+            return $upper;
+        }
+
+        return $value;
+    }
+
+    /**
+     * @param DateInterval $amount
+     * @throws InvalidDateIntervalException
+     */
+    #[Override]
+    public function expand(mixed $amount): self
+    {
+        if (! $amount instanceof DateInterval) {
+            throw new InvalidArgumentException('Amount must be a DateInterval instance');
+        }
+
+        $this->validateStep($amount);
+
+        return new self(
+            $this->lower?->sub($amount),
+            $this->upper?->add($amount),
+            $this->lowerBound,
+            $this->upperBound,
+            $this->getStep()
+        );
+    }
+
+    /**
+     * @param DateInterval $amount
+     * @throws InvalidDateIntervalException
+     */
+    #[Override]
+    public function shrink(mixed $amount): self
+    {
+        if (! $amount instanceof DateInterval) {
+            throw new InvalidArgumentException('Amount must be a DateInterval instance');
+        }
+
+        $this->validateStep($amount);
+
+        $shrunk = new self(
+            $this->lower?->add($amount),
+            $this->upper?->sub($amount),
+            $this->lowerBound,
+            $this->upperBound,
+            $this->getStep()
+        );
+
+        if (! $shrunk->isBoundsValid()) {
+            throw new InvalidBoundException();
+        }
+
+        return $shrunk;
+    }
+
+    #[Override]
+    public function random(): DateTimeImmutable
+    {
+        if ($this->isEmpty()) {
+            throw new InvalidArgumentException('Cannot pick a random value from an empty range');
+        }
+
+        if ($this->getLowerBoundValue() === null || $this->getUpperBoundValue() === null) {
+            throw new InvalidArgumentException('Cannot pick a random value from an infinite range');
+        }
+
+        $series = $this->generateSeries();
+
+        return $series[array_rand($series)];
+    }
+
+    /**
+     * The generator never stops when the upper bound is infinite.
+     *
+     * @return Generator<int, DateTimeImmutable>
+     */
+    #[Override]
+    public function iterate(): Generator
+    {
+        if (! $this->isEmpty() && $this->getLowerBoundValue() === null) {
+            throw new InvalidArgumentException('Cannot iterate over a range with an infinite lower bound');
+        }
+
+        return $this->iterateValues();
+    }
+
+    /**
+     * @return array<DateRange>
+     */
+    #[Override]
+    public function chunk(int $count): array
+    {
+        if ($count <= 0) {
+            throw new InvalidArgumentException('Chunk size must be positive');
+        }
+
+        if ($this->isEmpty()) {
+            return [];
+        }
+
+        $lower = $this->getLowerBoundValue();
+        $upper = $this->getUpperBoundValue();
+
+        if ($lower === null || $upper === null) {
+            throw new InvalidArgumentException('Cannot chunk a range with an infinite bound');
+        }
+
+        $chunkSpan = $this->scaleStep($count - 1);
+        $chunks = [];
+        $start = $lower;
+
+        while ($this->compareDateOnly($start, $upper) <= 0) {
+            $candidate = $start->add($chunkSpan);
+            $end = $this->compareDateOnly($candidate, $upper) > 0 ? $upper : $candidate;
+            $chunks[] = new self($start, $end, '[', ']', $this->getStep());
+            $start = $end->add($this->getStep());
+        }
+
+        return $chunks;
     }
 
     #[Override]
@@ -490,6 +863,44 @@ readonly class DateRange implements RangeInterface
         if ($step->y === 0 && $step->m === 0 && $step->d === 0) {
             throw new InvalidDateIntervalException();
         }
+    }
+
+    /**
+     * @return Generator<int, DateTimeImmutable>
+     */
+    private function iterateValues(): Generator
+    {
+        if ($this->isEmpty()) {
+            return;
+        }
+
+        $lower = $this->getLowerBoundValue();
+        $upper = $this->getUpperBoundValue();
+
+        if ($lower === null) {
+            return;
+        }
+
+        $current = $lower;
+
+        while ($upper === null || $current <= $upper) {
+            yield $current;
+
+            $current = $current->add($this->getStep());
+        }
+    }
+
+    /**
+     * Multiplies the step interval by an integer factor, component by component.
+     */
+    private function scaleStep(int $times): DateInterval
+    {
+        return new DateInterval(sprintf(
+            'P%dY%dM%dD',
+            $this->getStep()->y * $times,
+            $this->getStep()->m * $times,
+            $this->getStep()->d * $times
+        ));
     }
 
     private function compareDateOnly(DateTimeInterface $date1, DateTimeInterface $date2): int

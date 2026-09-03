@@ -45,6 +45,24 @@ This class supports custom step intervals (seconds, minutes, hours) for generati
 
 For detailed documentation on the TimeRange class, see [TimeRange Documentation](doc/TimeRange.md).
 
+### RangeCollection
+
+The `RangeCollection` class is an immutable collection of ranges of the same type and step. It normalizes overlapping ranges (`merge()`), finds the free slots between them (`gaps()`), and sums their lengths (`totalLength()`).
+
+For detailed documentation on the RangeCollection class, see [RangeCollection Documentation](doc/RangeCollection.md).
+
+## Available Operations
+
+Every range type implements the same API:
+
+- **Predicates** : `contains()`, `containsRange()`, `overlap()`, `isBefore()`, `isAfter()`, `isAdjacent()`, `isEmpty()`, `isBoundsValid()`, `equals()`
+- **Set operations** : `union()`, `intersection()`, `difference()`, `gap()`
+- **Values** : `length()`, `clamp()`, `random()`, `getLowerBoundValue()`, `getUpperBoundValue()`, `getStep()`
+- **Iteration** : `generateSeries()`, `iterate()` (lazy Generator), `chunk()`
+- **Transformations** : `split()`, `shift()`, `expand()`, `shrink()`, `scale()`, `clone()`, `__toString()` / `fromString()`
+
+`DateRange` also provides the `fromMonth()`, `fromYear()` and `fromWeek()` factories.
+
 ## Quick Examples
 
 ### IntRange Example
@@ -152,6 +170,26 @@ $times = $range->generateSeries(); // [09:00:00, 11:00:00, 13:00:00, 15:00:00, 1
 
 // Or parse from a string
 $range = TimeRange::fromString('[09:00:00,17:00:00]');
+```
+
+### RangeCollection Example
+
+```php
+use Ciloe\Ranges\DateRange;
+use Ciloe\Ranges\RangeCollection;
+use DateTimeImmutable;
+
+$bookings = new RangeCollection(
+    new DateRange(new DateTimeImmutable('2025-06-10'), new DateTimeImmutable('2025-06-15'), '[', ']'),
+    new DateRange(new DateTimeImmutable('2025-06-01'), new DateTimeImmutable('2025-06-12'), '[', ']'),
+    new DateRange(new DateTimeImmutable('2025-06-20'), new DateTimeImmutable('2025-06-25'), '[', ']'),
+);
+
+// Normalize into sorted, disjoint ranges
+$bookings->merge()->getRanges(); // [2025-06-01,2025-06-15], [2025-06-20,2025-06-25]
+
+// The free slots between the bookings
+$bookings->gaps()->getRanges(); // [2025-06-16,2025-06-19]
 ```
 
 ## Exceptions
