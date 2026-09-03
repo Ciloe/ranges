@@ -9,6 +9,7 @@ use Ciloe\Ranges\Exception\InvalidBoundException;
 use Ciloe\Ranges\Exception\InvalidDateIntervalException;
 use Ciloe\Ranges\Exception\InvalidInfiniteBoundException;
 use DateInterval;
+use DateMalformedStringException;
 use DateTime;
 use DateTimeImmutable;
 use DateTimeInterface;
@@ -30,7 +31,7 @@ readonly class DateRange implements RangeInterface
         public string $upperBound = ')',
         public DateInterval $step = new DateInterval('P1D'),
     ) {
-        $this->validateDateInterval($step);
+        $this->validateStep($step);
     }
 
     #[Override]
@@ -57,8 +58,12 @@ readonly class DateRange implements RangeInterface
 
         list(, $lowerBound, $lowerStr, $upperStr, $upperBound) = $matches;
 
-        $lower = ($lowerStr === 'null' || $lowerStr === '') ? null : new DateTimeImmutable($lowerStr);
-        $upper = ($upperStr === 'null' || $upperStr === '') ? null : new DateTimeImmutable($upperStr);
+        try {
+            $lower = ($lowerStr === 'null' || $lowerStr === '') ? null : new DateTimeImmutable($lowerStr);
+            $upper = ($upperStr === 'null' || $upperStr === '') ? null : new DateTimeImmutable($upperStr);
+        } catch (DateMalformedStringException $e) {
+            throw new InvalidArgumentException('Invalid range format', 0, $e);
+        }
 
         if (($lower === null && $lowerBound === '[') || ($upper === null && $upperBound === ']')) {
             throw new InvalidInfiniteBoundException();
@@ -151,14 +156,14 @@ readonly class DateRange implements RangeInterface
         }
 
         if ($lower === null) {
-            return $value <= $upper;
+            return $this->compareDateOnly($value, $upper) <= 0;
         }
 
         if ($upper === null) {
-            return $value >= $lower;
+            return $this->compareDateOnly($value, $lower) >= 0;
         }
 
-        return $value >= $lower && $value <= $upper;
+        return $this->compareDateOnly($value, $lower) >= 0 && $this->compareDateOnly($value, $upper) <= 0;
     }
 
     #[Override]
@@ -263,7 +268,7 @@ readonly class DateRange implements RangeInterface
             $upper = $this->maxDate($thisUpper, $rangeUpper);
         }
 
-        return new self($lower, $upper, '[', ']', $this->getStep());
+        return new self($lower, $upper, $lower === null ? '(' : '[', $upper === null ? ')' : ']', $this->getStep());
     }
 
     #[Override]
@@ -302,7 +307,7 @@ readonly class DateRange implements RangeInterface
             return null;
         }
 
-        return new self($lower, $upper, '[', ']', $this->getStep());
+        return new self($lower, $upper, $lower === null ? '(' : '[', $upper === null ? ')' : ']', $this->getStep());
     }
 
     /**
@@ -468,9 +473,35 @@ readonly class DateRange implements RangeInterface
         }
     }
 
+    /**
+     * The step must move forward by at least one day, otherwise length() divides by zero
+     * and generateSeries() never terminates.
+     *
+     * @throws InvalidDateIntervalException
+     */
+    private function validateStep(DateInterval $step): void
+    {
+        $this->validateDateInterval($step);
+
+        if ($step->invert !== 0 || $step->y < 0 || $step->m < 0 || $step->d < 0) {
+            throw new InvalidDateIntervalException();
+        }
+
+        if ($step->y === 0 && $step->m === 0 && $step->d === 0) {
+            throw new InvalidDateIntervalException();
+        }
+    }
+
+    private function compareDateOnly(DateTimeInterface $date1, DateTimeInterface $date2): int
+    {
+        return $date1->format('Y-m-d') <=> $date2->format('Y-m-d');
+    }
+
     private function getStepDays(): int
     {
-        $reference = new DateTimeImmutable();
+        // Fixed reference to keep the result deterministic: measured from "now",
+        // a P1M step would be worth 28 to 31 days depending on the current month
+        $reference = new DateTimeImmutable('2001-01-01');
         $after = $reference->add($this->getStep());
 
         return (int) $reference->diff($after)->days;

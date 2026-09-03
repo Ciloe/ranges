@@ -50,6 +50,8 @@ new DateRange(
 );
 ```
 
+The step must be a strictly positive date-only interval: an `InvalidDateIntervalException` is thrown if it contains time components (hours, minutes, seconds), if it is zero, or if it is negative/inverted.
+
 ### From a String
 
 ```php
@@ -70,24 +72,26 @@ DateRange::fromString('(,)');                      // Range (-∞,+∞)
 - `isBoundsValid()` : Checks if the bounds are valid (lower ≤ upper)
 - `getLowerBoundValue()` : Returns the effective value of the lower bound
 - `getUpperBoundValue()` : Returns the effective value of the upper bound
-- `contains(DateTimeInterface $value)` : Checks if a date is in the range
-- `length()` : Calculates the length of the range (number of days)
+- `contains(DateTimeInterface $value)` : Checks if a date is in the range (the time part of the value is ignored)
+- `length()` : Calculates the number of values in the range, considering the step (null for infinite ranges)
 - `getStep()` : Returns the step interval
 
 ### Operations Between Ranges
 
 - `overlap(DateRange $range)` : Checks if two ranges overlap
-- `union(DateRange $range)` : Calculates the union of two ranges
-- `intersection(DateRange $range)` : Calculates the intersection of two ranges
-- `equals(DateRange $range)` : Checks if two ranges are equal
+- `union(DateRange $range)` : Calculates the union of two ranges (returns null if the steps differ)
+- `intersection(DateRange $range)` : Calculates the intersection of two ranges (returns null if the steps differ or the ranges do not intersect)
+- `equals(DateRange $range)` : Checks if two ranges are equal (effective bounds and step)
+
+Steps are compared by their equivalent number of days, measured from a fixed reference date so the result does not depend on when the code runs.
 
 ### Transformations
 
 - `generateSeries()` : Generates an array of dates in the range
-- `split(DateTimeInterface $point)` : Divides the range into two at the specified date
+- `split(DateTimeInterface $point)` : Divides the range into two at the specified date (returns the original range alone if the point is outside)
 - `clone()` : Creates a copy of the range
-- `shift(DateInterval $offset)` : Shifts the range by the specified time interval
-- `scale(DateInterval $factor)` : This function is not supported for DateRange
+- `shift(DateInterval $offset)` : Shifts the range by the specified interval (the offset must not contain time components; an inverted interval shifts backwards)
+- `scale(DateInterval $factor)` : Not supported, always throws an `InvalidArgumentException`
 - `__toString()` : Converts the range to a string
 
 ## Advanced Examples
@@ -166,6 +170,39 @@ $range = new DateRange(null, null, '(', ')');
 $range->contains(new DateTimeImmutable('1900-01-01')); // true
 $range->contains(new DateTimeImmutable('2023-01-01')); // true
 $range->contains(new DateTimeImmutable('2100-01-01')); // true
+```
+
+### The Time Part Is Ignored
+
+`contains()` compares dates only, so a value carrying a time component still belongs to the range of its day:
+
+```php
+$range = new DateRange(
+    new DateTimeImmutable('2023-01-01'),
+    new DateTimeImmutable('2023-01-10'),
+    '[',
+    ']'
+);
+$range->contains(new DateTimeImmutable('2023-01-10 15:30:00')); // true
+$range->contains(new DateTimeImmutable('2023-01-11 00:00:00')); // false
+```
+
+### Step and Exclusive Bounds
+
+The step defines the distance between two consecutive values. An exclusive bound is shifted by one step:
+
+```php
+$range = new DateRange(
+    new DateTimeImmutable('2023-01-01'),
+    new DateTimeImmutable('2023-01-10'),
+    '(',
+    ')',
+    new DateInterval('P2D')
+);
+$range->getLowerBoundValue(); // 2023-01-03
+$range->getUpperBoundValue(); // 2023-01-08
+$range->generateSeries(); // [2023-01-03, 2023-01-05, 2023-01-07]
+$range->length(); // 3
 ```
 
 ### Working with Different Step Intervals

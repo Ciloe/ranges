@@ -7,7 +7,6 @@ namespace Ciloe\Ranges;
 use Ciloe\Ranges\Exception\CantGenerateSeriesBecauseTheArrayIsTooLarge;
 use Ciloe\Ranges\Exception\InvalidBoundException;
 use Ciloe\Ranges\Exception\InvalidInfiniteBoundException;
-use Ciloe\Ranges\Exception\InvalidStepToGenerateSeriesException;
 use Exception;
 use InvalidArgumentException;
 use Override;
@@ -80,13 +79,21 @@ readonly class IntRange implements RangeInterface
     #[Override]
     public function getLowerBoundValue(): ?int
     {
-        return $this->lower === null ? null : ($this->lowerBound === '[' ? $this->lower : $this->lower + 1);
+        if ($this->lower === null) {
+            return null;
+        }
+
+        return $this->lowerBound === '[' ? $this->lower : $this->lower + $this->getStep();
     }
 
     #[Override]
     public function getUpperBoundValue(): ?int
     {
-        return $this->upper === null ? null : ($this->upperBound === ']' ? $this->upper : $this->upper - 1);
+        if ($this->upper === null) {
+            return null;
+        }
+
+        return $this->upperBound === ']' ? $this->upper : $this->upper - $this->getStep();
     }
 
     /**
@@ -162,7 +169,7 @@ readonly class IntRange implements RangeInterface
             null :
             max($this->getUpperBoundValue(), $range->getUpperBoundValue());
 
-        return new self($lower, $upper, '[', ']');
+        return new self($lower, $upper, $lower === null ? '(' : '[', $upper === null ? ')' : ']', $this->getStep());
     }
 
     #[Override]
@@ -183,7 +190,16 @@ readonly class IntRange implements RangeInterface
             return null;
         }
 
-        return new self($lower === PHP_INT_MIN ? null : $lower, $upper === PHP_INT_MAX ? null : $upper, '[', ']');
+        $lowerValue = $lower === PHP_INT_MIN ? null : $lower;
+        $upperValue = $upper === PHP_INT_MAX ? null : $upper;
+
+        return new self(
+            $lowerValue,
+            $upperValue,
+            $lowerValue === null ? '(' : '[',
+            $upperValue === null ? ')' : ']',
+            $this->getStep()
+        );
     }
 
     /**
@@ -207,8 +223,9 @@ readonly class IntRange implements RangeInterface
             return [];
         }
 
-        if ($upper !== $lower && ($upper - $lower) < $this->getStep()) {
-            throw new InvalidStepToGenerateSeriesException();
+        // Native range() rejects a step larger than the span; the series is then just [$lower]
+        if (($upper - $lower) < $this->getStep()) {
+            return [$lower];
         }
 
         try {

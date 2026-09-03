@@ -7,9 +7,9 @@ namespace Ciloe\Ranges;
 use Ciloe\Ranges\Exception\CantGenerateSeriesBecauseTheArrayIsTooLarge;
 use Ciloe\Ranges\Exception\InvalidBoundException;
 use Ciloe\Ranges\Exception\InvalidInfiniteBoundException;
-use Ciloe\Ranges\Exception\InvalidStepToGenerateSeriesException;
 use Ciloe\Ranges\Exception\InvalidTimeIntervalException;
 use DateInterval;
+use DateMalformedStringException;
 use DateTime;
 use DateTimeImmutable;
 use DateTimeInterface;
@@ -31,7 +31,7 @@ readonly class TimeRange implements RangeInterface
         public string $upperBound = ')',
         public DateInterval $step = new DateInterval('PT1S'),
     ) {
-        $this->validateDateInterval($step);
+        $this->validateStep($step);
     }
 
     #[Override]
@@ -59,8 +59,13 @@ readonly class TimeRange implements RangeInterface
         [, $lowerBound, $lowerStr, $upperStr, $upperBound] = $matches;
 
         $referenceDate = new DateTimeImmutable('today');
-        $lower = ($lowerStr === 'null' || $lowerStr === '') ? null : $referenceDate->modify($lowerStr);
-        $upper = ($upperStr === 'null' || $upperStr === '') ? null : $referenceDate->modify($upperStr);
+
+        try {
+            $lower = ($lowerStr === 'null' || $lowerStr === '') ? null : $referenceDate->modify($lowerStr);
+            $upper = ($upperStr === 'null' || $upperStr === '') ? null : $referenceDate->modify($upperStr);
+        } catch (DateMalformedStringException $e) {
+            throw new InvalidArgumentException('Invalid range format', 0, $e);
+        }
 
         if (($lower === null && $lowerBound === '[') || ($upper === null && $upperBound === ']')) {
             throw new InvalidInfiniteBoundException();
@@ -232,10 +237,7 @@ readonly class TimeRange implements RangeInterface
         $upperSeconds = (int) $upper->format('H') * 3600 + (int) $upper->format('i') * 60 + (int) $upper->format('s');
         $diffSeconds = $upperSeconds - $lowerSeconds;
 
-        $stepSeconds = $this->getStepSeconds();
-        $length = (int) ceil($diffSeconds / $stepSeconds) + 1;
-
-        return max($length, 0);
+        return intdiv($diffSeconds, $this->getStepSeconds()) + 1;
     }
 
     #[Override]
@@ -266,7 +268,7 @@ readonly class TimeRange implements RangeInterface
             $upper = $this->maxTime($thisUpper, $rangeUpper);
         }
 
-        return new self($lower, $upper, '[', ']', $this->getStep());
+        return new self($lower, $upper, $lower === null ? '(' : '[', $upper === null ? ')' : ']', $this->getStep());
     }
 
     #[Override]
@@ -305,7 +307,7 @@ readonly class TimeRange implements RangeInterface
             return null;
         }
 
-        return new self($lower, $upper, '[', ']', $this->getStep());
+        return new self($lower, $upper, $lower === null ? '(' : '[', $upper === null ? ')' : ']', $this->getStep());
     }
 
     /**
@@ -331,18 +333,14 @@ readonly class TimeRange implements RangeInterface
 
         $lowerSeconds = (int) $lower->format('H') * 3600 + (int) $lower->format('i') * 60 + (int) $lower->format('s');
         $upperSeconds = (int) $upper->format('H') * 3600 + (int) $upper->format('i') * 60 + (int) $upper->format('s');
-        $diffSeconds = $upperSeconds - $lowerSeconds;
         $stepSeconds = $this->getStepSeconds();
 
-        if ($diffSeconds > 0 && $diffSeconds < $stepSeconds) {
-            throw new InvalidStepToGenerateSeriesException();
-        }
-
         $series = [];
-        $current = clone $lower;
+        $current = $lower;
 
-        while ($this->compareTimeOnly($current, $upper) <= 0) {
-            $series[] = clone $current;
+        // Iterate on seconds to guarantee termination when the step crosses midnight
+        for ($seconds = $lowerSeconds; $seconds <= $upperSeconds; $seconds += $stepSeconds) {
+            $series[] = $current;
             $current = $current->add($this->getStep());
         }
 
@@ -476,6 +474,25 @@ readonly class TimeRange implements RangeInterface
     private function validateDateInterval(DateInterval $interval): void
     {
         if ($interval->y !== 0 || $interval->m !== 0 || $interval->d !== 0) {
+            throw new InvalidTimeIntervalException();
+        }
+    }
+
+    /**
+     * The step must move forward by at least one second, otherwise length() divides by zero
+     * and generateSeries() never terminates.
+     *
+     * @throws InvalidTimeIntervalException
+     */
+    private function validateStep(DateInterval $step): void
+    {
+        $this->validateDateInterval($step);
+
+        if ($step->invert !== 0 || $step->h < 0 || $step->i < 0 || $step->s < 0) {
+            throw new InvalidTimeIntervalException();
+        }
+
+        if ($step->h === 0 && $step->i === 0 && $step->s === 0) {
             throw new InvalidTimeIntervalException();
         }
     }

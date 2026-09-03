@@ -57,6 +57,12 @@ class DateRangeTest extends TestCase
         DateRange::fromString('invalid');
     }
 
+    public function testFromStringWithImpossibleDate()
+    {
+        $this->expectException(InvalidArgumentException::class);
+        DateRange::fromString('[2025-13-45,2025-14-07]');
+    }
+
     public function testFromStringInvalidInfiniteBounds()
     {
         $this->expectException(InvalidInfiniteBoundException::class);
@@ -167,6 +173,22 @@ class DateRangeTest extends TestCase
         $range->contains('2025-06-05');
     }
 
+    public function testContainsIgnoresTimeComponent()
+    {
+        $range = new DateRange(
+            new DateTimeImmutable('2025-06-04'),
+            new DateTimeImmutable('2025-06-07'),
+            '[',
+            ']'
+        );
+
+        $this->assertTrue($range->contains(new DateTimeImmutable('2025-06-04 00:00:01')));
+        $this->assertTrue($range->contains(new DateTimeImmutable('2025-06-07 10:00:00')));
+        $this->assertTrue($range->contains(new DateTimeImmutable('2025-06-07 23:59:59')));
+        $this->assertFalse($range->contains(new DateTimeImmutable('2025-06-03 23:59:59')));
+        $this->assertFalse($range->contains(new DateTimeImmutable('2025-06-08 00:00:00')));
+    }
+
     public function testContainsWithEmptyRange()
     {
         $range = new DateRange(
@@ -251,6 +273,31 @@ class DateRangeTest extends TestCase
         );
 
         $this->assertEquals(5, $range->length());
+    }
+
+    public function testMonthlyStepIsDeterministic()
+    {
+        // The step must be measured against a fixed reference (P1M = 31 days),
+        // not against today's date, otherwise length/union change with the current month
+        $monthly = new DateRange(
+            new DateTimeImmutable('2025-01-01'),
+            new DateTimeImmutable('2025-12-31'),
+            '[',
+            ']',
+            new DateInterval('P1M')
+        );
+
+        $this->assertEquals(12, $monthly->length());
+
+        $thirtyDays = new DateRange(
+            new DateTimeImmutable('2025-06-01'),
+            new DateTimeImmutable('2025-06-30'),
+            '[',
+            ']',
+            new DateInterval('P30D')
+        );
+
+        $this->assertNull($monthly->union($thirtyDays));
     }
 
     public function testLengthWithNullBounds()
@@ -641,6 +688,20 @@ class DateRangeTest extends TestCase
         $this->assertNull($union->getUpperBoundValue());
     }
 
+    public function testUnionAndIntersectionWithNullBoundsRoundTripThroughFromString()
+    {
+        $unbounded = new DateRange(null, new DateTimeImmutable('2025-06-07'), '(', ']');
+        $bounded = new DateRange(new DateTimeImmutable('2025-06-04'), new DateTimeImmutable('2025-06-10'), '[', ']');
+
+        $union = $unbounded->union($bounded);
+        $this->assertEquals('(,2025-06-10]', (string) $union);
+        $this->assertTrue(DateRange::fromString((string) $union)->equals($union));
+
+        $intersection = $unbounded->intersection(new DateRange(null, new DateTimeImmutable('2025-06-05'), '(', ']'));
+        $this->assertEquals('(,2025-06-05]', (string) $intersection);
+        $this->assertTrue(DateRange::fromString((string) $intersection)->equals($intersection));
+    }
+
     public function testIntersection()
     {
         $range1 = new DateRange(
@@ -927,6 +988,30 @@ class DateRangeTest extends TestCase
             '[',
             ']',
             new DateInterval('PT1H')
+        );
+    }
+
+    public function testZeroStepInConstructor()
+    {
+        $this->expectException(InvalidDateIntervalException::class);
+        new DateRange(
+            new DateTimeImmutable('2025-06-04'),
+            new DateTimeImmutable('2025-06-07'),
+            '[',
+            ']',
+            new DateInterval('P0D')
+        );
+    }
+
+    public function testInvertedStepInConstructor()
+    {
+        $this->expectException(InvalidDateIntervalException::class);
+        new DateRange(
+            new DateTimeImmutable('2025-06-04'),
+            new DateTimeImmutable('2025-06-07'),
+            '[',
+            ']',
+            DateInterval::createFromDateString('-1 day')
         );
     }
 

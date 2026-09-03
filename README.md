@@ -2,6 +2,11 @@
 
 This library provides classes for working with ranges of values.
 
+## Requirements
+
+- PHP 8.3 or higher
+- The BCMath extension (`ext-bcmath`), used by `BigIntRange`
+
 ## Installation
 
 ```bash
@@ -31,6 +36,14 @@ The `DateRange` class allows you to represent and manipulate date ranges. It off
 This class supports custom step intervals (days, weeks, months, etc.) for generating date series and provides operations for date range manipulation.
 
 For detailed documentation on the DateRange class, see [DateRange Documentation](doc/DateRange.md).
+
+### TimeRange
+
+The `TimeRange` class allows you to represent and manipulate time-of-day ranges. All comparisons only use the time part (hours, minutes, seconds) of the DateTimeImmutable objects — the date part is ignored.
+
+This class supports custom step intervals (seconds, minutes, hours) for generating time series and provides the same operations as the other range types.
+
+For detailed documentation on the TimeRange class, see [TimeRange Documentation](doc/TimeRange.md).
 
 ## Quick Examples
 
@@ -107,17 +120,54 @@ $weeklyDates = $weeklyRange->generateSeries(); // [2023-01-01, 2023-01-08, 2023-
 $shifted = $range->shift(new DateInterval('P1M')); // [2023-02-01, 2023-02-10]
 ```
 
+### TimeRange Example
+
+```php
+use Ciloe\Ranges\TimeRange;
+use DateTimeImmutable;
+use DateInterval;
+
+$today = new DateTimeImmutable('today');
+
+// Create a time range from 09:00:00 to 17:00:00
+$range = new TimeRange(
+    $today->setTime(9, 0, 0),
+    $today->setTime(17, 0, 0),
+    '[',
+    ']'
+);
+
+// Check if a time is in the range (the date part is ignored)
+$range->contains(new DateTimeImmutable('2030-06-15 12:30:00')); // true
+
+// Generate a series of times with a 2-hour step
+$range = new TimeRange(
+    $today->setTime(9, 0, 0),
+    $today->setTime(17, 0, 0),
+    '[',
+    ']',
+    new DateInterval('PT2H')
+);
+$times = $range->generateSeries(); // [09:00:00, 11:00:00, 13:00:00, 15:00:00, 17:00:00]
+
+// Or parse from a string
+$range = TimeRange::fromString('[09:00:00,17:00:00]');
+```
+
 ## Exceptions
 
-- `InvalidArgumentException` : Invalid range format
+- `InvalidArgumentException` : Invalid range format, invalid value type, or unsupported operation
 - `InvalidBoundException` : Invalid bounds (lower > upper)
-- `InvalidInfiniteBoundException` : Infinite bound with inclusion
-- `InvalidStepToGenerateSeriesException` : Invalid step for generating a series
-- `CantGenerateSeriesBecauseTheArrayIsTooLarge` : Series too large to be generated
+- `InvalidInfiniteBoundException` : Infinite bound declared as inclusive
+- `InvalidDateIntervalException` : Invalid DateRange interval (time components in a step or offset, zero or negative step)
+- `InvalidTimeIntervalException` : Invalid TimeRange interval (date components in a step or offset, zero or negative step)
+- `CantGenerateSeriesBecauseTheArrayIsTooLarge` : Series too large to be generated (e.g. infinite bounds)
 
 ## Notes
 
 - Ranges can have infinite bounds (null)
 - Bounds can be inclusive (`[`, `]`) or exclusive (`(`, `)`)
-- The step only affects series generation, not other operations
-- Operations between ranges (union, intersection) require the same step
+- An exclusive bound is shifted by one step: with a step of 5, `(0,20)` has effective bounds 5 and 15
+- Infinite bounds must be exclusive: `fromString()` rejects `[,10]`, and `union()`/`intersection()` always produce exclusive infinite bounds
+- The step drives `length()`, `generateSeries()`, and the effective value of exclusive bounds
+- Operations between ranges take the step into account: `union()`/`intersection()` return null when the steps differ, `equals()` returns false

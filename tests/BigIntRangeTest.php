@@ -8,7 +8,6 @@ use Ciloe\Ranges\BigIntRange;
 use Ciloe\Ranges\Exception\CantGenerateSeriesBecauseTheArrayIsTooLarge;
 use Ciloe\Ranges\Exception\InvalidBoundException;
 use Ciloe\Ranges\Exception\InvalidInfiniteBoundException;
-use Ciloe\Ranges\Exception\InvalidStepToGenerateSeriesException;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
@@ -45,6 +44,21 @@ class BigIntRangeTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         BigIntRange::fromString('invalid');
+    }
+
+    public function testExclusiveBoundsAreShiftedByStep(): void
+    {
+        $range = new BigIntRange('4', '20', '(', ']', '5');
+        $this->assertSame('9', $range->getLowerBoundValue());
+        $this->assertSame('20', $range->getUpperBoundValue());
+
+        $range = new BigIntRange('0', '20', '[', ')', '5');
+        $this->assertSame('0', $range->getLowerBoundValue());
+        $this->assertSame('15', $range->getUpperBoundValue());
+
+        $range = new BigIntRange('9223372036854775803', '9223372036854775823', '(', ')', '5');
+        $this->assertSame('9223372036854775808', $range->getLowerBoundValue());
+        $this->assertSame('9223372036854775818', $range->getUpperBoundValue());
     }
 
     public function testContainsWithVeryLargeIntegers(): void
@@ -628,6 +642,21 @@ class BigIntRangeTest extends TestCase
         $this->assertNull($result->getUpperBoundValue());
     }
 
+    public function testUnionAndIntersectionWithNullBoundsRoundTripThroughFromString(): void
+    {
+        $union = (new BigIntRange(null, '10', '(', ']'))->union(new BigIntRange('5', '15', '[', ']'));
+        $this->assertSame('(,15]', (string) $union);
+        $this->assertTrue(BigIntRange::fromString((string) $union)->equals($union));
+
+        $union = (new BigIntRange(null, '10', '(', ']'))->union(new BigIntRange('5', null, '[', ')'));
+        $this->assertSame('(,)', (string) $union);
+        $this->assertTrue(BigIntRange::fromString((string) $union)->equals($union));
+
+        $intersection = (new BigIntRange(null, '10', '(', ']'))->intersection(new BigIntRange(null, '5', '(', ']'));
+        $this->assertSame('(,5]', (string) $intersection);
+        $this->assertTrue(BigIntRange::fromString((string) $intersection)->equals($intersection));
+    }
+
     public function testIntersectionWithNonOverlappingRanges(): void
     {
         $range1 = new BigIntRange('1', '5', '[', ']');
@@ -655,9 +684,10 @@ class BigIntRangeTest extends TestCase
 
     public function testGenerateSeriesWithStepGreaterThanRange(): void
     {
-        $this->expectException(InvalidStepToGenerateSeriesException::class);
+        // Consistent with length(): the series contains at least the lower bound
         $range = new BigIntRange('1', '5', '[', ']', '10');
-        $range->generateSeries();
+        $this->assertSame(['1'], $range->generateSeries());
+        $this->assertSame('1', $range->length());
     }
 
     public function testSplitWithPointOutsideRange(): void

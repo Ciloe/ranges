@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        php-versions: ['8.2', '8.3', '8.4']
+        php-versions: ['8.3', '8.4', '8.5']
     name: Setup PHP ${{ matrix.php-versions }}
     steps:
       - name: Checkout code
@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        php-versions: ['8.2', '8.3', '8.4']
+        php-versions: ['8.3', '8.4', '8.5']
     name: PHPStan on PHP ${{ matrix.php-versions }}
     steps:
       - name: Checkout code
@@ -81,7 +81,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        php-versions: ['8.2', '8.3', '8.4']
+        php-versions: ['8.3', '8.4', '8.5']
     name: PHPCS on PHP ${{ matrix.php-versions }}
     steps:
       - name: Checkout code
@@ -115,7 +115,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        php-versions: ['8.2', '8.3', '8.4']
+        php-versions: ['8.3', '8.4', '8.5']
     name: ECS on PHP ${{ matrix.php-versions }}
     steps:
       - name: Checkout code
@@ -149,7 +149,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        php-versions: ['8.2', '8.3', '8.4']
+        php-versions: ['8.3', '8.4', '8.5']
     name: PHPUnit on PHP ${{ matrix.php-versions }}
     steps:
       - name: Checkout code

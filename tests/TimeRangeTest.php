@@ -7,7 +7,6 @@ namespace Tests\Ciloe\Ranges;
 use Ciloe\Ranges\Exception\CantGenerateSeriesBecauseTheArrayIsTooLarge;
 use Ciloe\Ranges\Exception\InvalidBoundException;
 use Ciloe\Ranges\Exception\InvalidInfiniteBoundException;
-use Ciloe\Ranges\Exception\InvalidStepToGenerateSeriesException;
 use Ciloe\Ranges\Exception\InvalidTimeIntervalException;
 use Ciloe\Ranges\RangeInterface;
 use Ciloe\Ranges\TimeRange;
@@ -57,6 +56,12 @@ class TimeRangeTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         TimeRange::fromString('invalid');
+    }
+
+    public function testFromStringWithImpossibleTime()
+    {
+        $this->expectException(InvalidArgumentException::class);
+        TimeRange::fromString('[25:99:99,26:00:00]');
     }
 
     public function testFromStringInvalidInfiniteBounds()
@@ -277,6 +282,21 @@ class TimeRangeTest extends TestCase
         $this->assertEquals('23:00:00', $union->getUpperBoundValue()->format('H:i:s'));
     }
 
+    public function testUnionAndIntersectionWithNullBoundsRoundTripThroughFromString()
+    {
+        $referenceDate = new DateTimeImmutable('today');
+        $unbounded = new TimeRange(null, $referenceDate->setTime(21, 0, 0), '(', ']');
+        $bounded = new TimeRange($referenceDate->setTime(20, 0, 0), $referenceDate->setTime(22, 0, 0), '[', ']');
+
+        $union = $unbounded->union($bounded);
+        $this->assertEquals('(,22:00:00]', (string) $union);
+        $this->assertTrue(TimeRange::fromString((string) $union)->equals($union));
+
+        $intersection = $unbounded->intersection(new TimeRange(null, $referenceDate->setTime(20, 30, 0), '(', ']'));
+        $this->assertEquals('(,20:30:00]', (string) $intersection);
+        $this->assertTrue(TimeRange::fromString((string) $intersection)->equals($intersection));
+    }
+
     public function testIntersection()
     {
         $referenceDate = new DateTimeImmutable('today');
@@ -365,6 +385,32 @@ class TimeRangeTest extends TestCase
             '[',
             ']',
             new DateInterval('P1MT1S'),
+        );
+    }
+
+    public function testZeroStepInConstructor()
+    {
+        $referenceDate = new DateTimeImmutable('today');
+        $this->expectException(InvalidTimeIntervalException::class);
+        new TimeRange(
+            $referenceDate->setTime(20, 0, 0),
+            $referenceDate->setTime(22, 0, 0),
+            '[',
+            ']',
+            new DateInterval('PT0S'),
+        );
+    }
+
+    public function testInvertedStepInConstructor()
+    {
+        $referenceDate = new DateTimeImmutable('today');
+        $this->expectException(InvalidTimeIntervalException::class);
+        new TimeRange(
+            $referenceDate->setTime(20, 0, 0),
+            $referenceDate->setTime(22, 0, 0),
+            '[',
+            ']',
+            DateInterval::createFromDateString('-1 hour'),
         );
     }
 
@@ -699,8 +745,29 @@ class TimeRangeTest extends TestCase
         $range->generateSeries();
     }
 
-    public function testInvalidStepToGenerateSeriesException()
+    public function testGenerateSeriesTerminatesWhenStepCrossesMidnight()
     {
+        $referenceDate = new DateTimeImmutable('today');
+
+        // The 30-minute step wraps to 00:00 the next day without ever exceeding 23:59:59:
+        // the series must stop at the upper bound, not loop forever
+        $range = new TimeRange(
+            $referenceDate->setTime(23, 0, 0),
+            $referenceDate->setTime(23, 59, 59),
+            '[',
+            ']',
+            new DateInterval('PT30M')
+        );
+
+        $series = $range->generateSeries();
+        $this->assertCount(2, $series);
+        $this->assertEquals('23:00:00', $series[0]->format('H:i:s'));
+        $this->assertEquals('23:30:00', $series[1]->format('H:i:s'));
+    }
+
+    public function testGenerateSeriesWithStepGreaterThanRange()
+    {
+        // Consistent with length(): the series contains at least the lower bound
         $referenceDate = new DateTimeImmutable('today');
         $range = new TimeRange(
             $referenceDate->setTime(20, 0, 0),
@@ -710,8 +777,10 @@ class TimeRangeTest extends TestCase
             new DateInterval('PT2S')
         );
 
-        $this->expectException(InvalidStepToGenerateSeriesException::class);
-        $range->generateSeries();
+        $series = $range->generateSeries();
+        $this->assertCount(1, $series);
+        $this->assertEquals('20:00:00', $series[0]->format('H:i:s'));
+        $this->assertEquals(1, $range->length());
     }
 
     public function testCompareTimeOnlyWithDifferentDates()
@@ -950,6 +1019,23 @@ class TimeRangeTest extends TestCase
             new DateInterval('PT2S')
         );
         $this->assertEquals(6, $range->length());
+    }
+
+    public function testLengthMatchesGenerateSeriesWhenDiffIsNotMultipleOfStep()
+    {
+        $referenceDate = new DateTimeImmutable('today');
+
+        // 5 seconds with a 2s step: the series is 20:00:00, 20:00:02, 20:00:04
+        $range = new TimeRange(
+            $referenceDate->setTime(20, 0, 0),
+            $referenceDate->setTime(20, 0, 5),
+            '[',
+            ']',
+            new DateInterval('PT2S')
+        );
+
+        $this->assertEquals(3, $range->length());
+        $this->assertCount(3, $range->generateSeries());
     }
 
     public function testUnionWithNullBounds()

@@ -35,9 +35,11 @@ new IntRange(
     ?int $upper = null,     // Upper bound (null for +∞)
     string $lowerBound = '(', // Lower bound type: '[' (inclusive) or '(' (exclusive)
     string $upperBound = ')', // Upper bound type: ']' (inclusive) or ')' (exclusive)
-    int $step = 1           // Step for series generation
+    int $step = 1           // Distance between two consecutive values (must be positive)
 );
 ```
+
+The step must be strictly positive: an `InvalidArgumentException` is thrown otherwise.
 
 ### From a String
 
@@ -59,22 +61,23 @@ IntRange::fromString('(,)');     // Range (-∞,+∞)
 - `getLowerBoundValue()` : Returns the effective value of the lower bound
 - `getUpperBoundValue()` : Returns the effective value of the upper bound
 - `contains(int $value)` : Checks if a value is in the range
-- `length()` : Calculates the length of the range (number of integers)
+- `length()` : Calculates the number of values in the range, considering the step (null for infinite ranges)
+- `getStep()` : Returns the step
 
 ### Operations Between Ranges
 
 - `overlap(IntRange $range)` : Checks if two ranges overlap
-- `union(IntRange $range)` : Calculates the union of two ranges
-- `intersection(IntRange $range)` : Calculates the intersection of two ranges
-- `equals(IntRange $range)` : Checks if two ranges are equal
+- `union(IntRange $range)` : Calculates the union of two ranges (returns null if the steps differ)
+- `intersection(IntRange $range)` : Calculates the intersection of two ranges (returns null if the steps differ or the ranges do not intersect)
+- `equals(IntRange $range)` : Checks if two ranges are equal (effective bounds and step)
 
 ### Transformations
 
 - `generateSeries()` : Generates an array of values in the range
-- `split(int $point)` : Divides the range into two at the specified point
+- `split(int $point)` : Divides the range into two at the specified point (returns the original range alone if the point is outside)
 - `clone()` : Creates a copy of the range
 - `shift(int $offset)` : Shifts the range by the specified value
-- `scale(int $factor)` : Multiplies the bounds by the specified factor
+- `scale(int $factor)` : Multiplies the bounds and the step by the specified factor (bounds are swapped when the factor is negative)
 - `__toString()` : Converts the range to a string
 
 ## Advanced Examples
@@ -105,6 +108,23 @@ $shifted = $range->shift(5); // [6,15]
 $range = new IntRange(1, 10, '[', ']');
 $scaled = $range->scale(2); // [2,20]
 $negativeScaled = $range->scale(-1); // [-10,-1]
+```
+
+### Step and Exclusive Bounds
+
+The step defines the distance between two consecutive values of the range. An exclusive bound is shifted by one step (not by 1):
+
+```php
+$range = new IntRange(0, 20, '(', ')', 5);
+$range->getLowerBoundValue(); // 5
+$range->getUpperBoundValue(); // 15
+$range->generateSeries(); // [5, 10, 15]
+$range->length(); // 3
+
+// A step larger than the span still yields the lower bound
+$range = new IntRange(1, 5, '[', ']', 10);
+$range->generateSeries(); // [1]
+$range->length(); // 1
 ```
 
 ### Infinite Ranges

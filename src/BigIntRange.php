@@ -7,7 +7,6 @@ namespace Ciloe\Ranges;
 use Ciloe\Ranges\Exception\CantGenerateSeriesBecauseTheArrayIsTooLarge;
 use Ciloe\Ranges\Exception\InvalidBoundException;
 use Ciloe\Ranges\Exception\InvalidInfiniteBoundException;
-use Ciloe\Ranges\Exception\InvalidStepToGenerateSeriesException;
 use Exception;
 use InvalidArgumentException;
 use Override;
@@ -99,7 +98,7 @@ readonly class BigIntRange implements RangeInterface
             return null;
         }
 
-        return $this->lowerBound === '[' ? $this->lower : bcadd($this->lower, '1');
+        return $this->lowerBound === '[' ? $this->lower : bcadd($this->lower, $this->getStep());
     }
 
     #[Override]
@@ -109,7 +108,7 @@ readonly class BigIntRange implements RangeInterface
             return null;
         }
 
-        return $this->upperBound === ']' ? $this->upper : bcsub($this->upper, '1');
+        return $this->upperBound === ']' ? $this->upper : bcsub($this->upper, $this->getStep());
     }
 
     /**
@@ -204,11 +203,7 @@ readonly class BigIntRange implements RangeInterface
 
         $diff = bcsub($upper, $lower);
 
-        $includeUpper = bcmod($diff, $this->getStep()) === '0' ? '1' : '0';
-
-        $length = bcadd(bcdiv($diff, $this->getStep(), 0), $includeUpper);
-
-        return $length;
+        return bcadd(bcdiv($diff, $this->getStep(), 0), '1');
     }
 
     #[Override]
@@ -239,7 +234,7 @@ readonly class BigIntRange implements RangeInterface
             $upper = bccomp($thisUpper, $rangeUpper) >= 0 ? $thisUpper : $rangeUpper;
         }
 
-        return new self($lower, $upper, '[', ']', $this->getStep());
+        return new self($lower, $upper, $lower === null ? '(' : '[', $upper === null ? ')' : ']', $this->getStep());
     }
 
     #[Override]
@@ -278,7 +273,7 @@ readonly class BigIntRange implements RangeInterface
             return null;
         }
 
-        return new self($lower, $upper, '[', ']', $this->getStep());
+        return new self($lower, $upper, $lower === null ? '(' : '[', $upper === null ? ')' : ']', $this->getStep());
     }
 
     /**
@@ -300,10 +295,6 @@ readonly class BigIntRange implements RangeInterface
 
         if (bccomp($lower, $upper) > 0) {
             return [];
-        }
-
-        if (bccomp($upper, $lower) !== 0 && bccomp(bcsub($upper, $lower), $this->getStep()) < 0) {
-            throw new InvalidStepToGenerateSeriesException();
         }
 
         $estimatedSize = min(1000000, (int) bcadd(bcdiv(bcsub($upper, $lower), $this->getStep(), 0), '1'));
