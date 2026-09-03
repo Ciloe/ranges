@@ -6,8 +6,9 @@ namespace Ciloe\Ranges;
 
 use Ciloe\Ranges\Exception\CantGenerateSeriesBecauseTheArrayIsTooLarge;
 use Ciloe\Ranges\Exception\InvalidBoundException;
-use Ciloe\Ranges\Exception\InvalidDateIntervalException;
 use Ciloe\Ranges\Exception\InvalidInfiniteBoundException;
+use Ciloe\Ranges\Exception\InvalidStepToGenerateSeriesException;
+use Ciloe\Ranges\Exception\InvalidTimeIntervalException;
 use DateInterval;
 use DateTime;
 use DateTimeImmutable;
@@ -18,17 +19,17 @@ use Override;
 /**
  * @implements RangeInterface<DateTimeImmutable, DateInterval>
  */
-readonly class DateRange implements RangeInterface
+readonly class TimeRange implements RangeInterface
 {
     /**
-     * @throws InvalidDateIntervalException
+     * @throws InvalidTimeIntervalException
      */
     public function __construct(
         public ?DateTimeImmutable $lower = null,
         public ?DateTimeImmutable $upper = null,
         public string $lowerBound = '(',
         public string $upperBound = ')',
-        public DateInterval $step = new DateInterval('P1D'),
+        public DateInterval $step = new DateInterval('PT1S'),
     ) {
         $this->validateDateInterval($step);
     }
@@ -36,8 +37,8 @@ readonly class DateRange implements RangeInterface
     #[Override]
     public function __toString(): string
     {
-        $lowerValue = $this->lower === null ? '' : $this->lower->format('Y-m-d');
-        $upperValue = $this->upper === null ? '' : $this->upper->format('Y-m-d');
+        $lowerValue = $this->lower === null ? '' : $this->lower->format('H:i:s');
+        $upperValue = $this->upper === null ? '' : $this->upper->format('H:i:s');
 
         return $this->lowerBound . $lowerValue . ',' . $upperValue . $this->upperBound;
     }
@@ -45,20 +46,21 @@ readonly class DateRange implements RangeInterface
     #[Override]
     public static function fromString(string $range): self
     {
-        $matchResult = \Safe\preg_match(
-            '/^(\[|\()([0-9]{4}-[0-9]{2}-[0-9]{2}|null)?,([0-9]{4}-[0-9]{2}-[0-9]{2}|null)?(\]|\))$/',
-            $range,
-            $matches,
-        );
-
-        if ($matches === null || $matchResult === 0) {
+        if (
+            ! preg_match(
+                '/^(\[|\()([0-9]{2}:[0-9]{2}:[0-9]{2}|null)?,([0-9]{2}:[0-9]{2}:[0-9]{2}|null)?(\]|\))$/',
+                $range,
+                $matches,
+            )
+        ) {
             throw new InvalidArgumentException('Invalid range format');
         }
 
-        list(, $lowerBound, $lowerStr, $upperStr, $upperBound) = $matches;
+        [, $lowerBound, $lowerStr, $upperStr, $upperBound] = $matches;
 
-        $lower = ($lowerStr === 'null' || $lowerStr === '') ? null : new DateTimeImmutable($lowerStr);
-        $upper = ($upperStr === 'null' || $upperStr === '') ? null : new DateTimeImmutable($upperStr);
+        $referenceDate = new DateTimeImmutable('today');
+        $lower = ($lowerStr === 'null' || $lowerStr === '') ? null : $referenceDate->modify($lowerStr);
+        $upper = ($upperStr === 'null' || $upperStr === '') ? null : $referenceDate->modify($upperStr);
 
         if (($lower === null && $lowerBound === '[') || ($upper === null && $upperBound === ']')) {
             throw new InvalidInfiniteBoundException();
@@ -80,7 +82,7 @@ readonly class DateRange implements RangeInterface
             return false;
         }
 
-        return $this->lower == $this->upper &&
+        return $this->compareTimeOnly($this->lower, $this->upper) === 0 &&
             $this->lowerBound === '(' && $this->upperBound === ')';
     }
 
@@ -94,7 +96,7 @@ readonly class DateRange implements RangeInterface
             return true;
         }
 
-        return $lower <= $upper;
+        return $this->compareTimeOnly($lower, $upper) <= 0;
     }
 
     #[Override]
@@ -151,21 +153,21 @@ readonly class DateRange implements RangeInterface
         }
 
         if ($lower === null) {
-            return $value <= $upper;
+            return $this->compareTimeOnly($value, $upper) <= 0;
         }
 
         if ($upper === null) {
-            return $value >= $lower;
+            return $this->compareTimeOnly($value, $lower) >= 0;
         }
 
-        return $value >= $lower && $value <= $upper;
+        return $this->compareTimeOnly($value, $lower) >= 0 && $this->compareTimeOnly($value, $upper) <= 0;
     }
 
     #[Override]
     public function overlap(RangeInterface $range): bool
     {
         if (! $range instanceof self) {
-            throw new InvalidArgumentException('Range must be an instance of DateRange');
+            throw new InvalidArgumentException('Range must be an instance of TimeRange');
         }
 
         if ($this->isEmpty() || $range->isEmpty()) {
@@ -197,19 +199,19 @@ readonly class DateRange implements RangeInterface
         }
 
         if ($a1 === null) {
-            return $a2 >= $b1;
+            return $this->compareTimeOnly($a2, $b1) >= 0;
         }
         if ($a2 === null) {
-            return $b2 >= $a1;
+            return $this->compareTimeOnly($b2, $a1) >= 0;
         }
         if ($b1 === null) {
-            return $b2 >= $a1;
+            return $this->compareTimeOnly($b2, $a1) >= 0;
         }
         if ($b2 === null) {
-            return $a2 >= $b1;
+            return $this->compareTimeOnly($a2, $b1) >= 0;
         }
 
-        return $a2 >= $b1 && $b2 >= $a1;
+        return $this->compareTimeOnly($a2, $b1) >= 0 && $this->compareTimeOnly($b2, $a1) >= 0;
     }
 
     #[Override]
@@ -222,15 +224,16 @@ readonly class DateRange implements RangeInterface
             return null;
         }
 
-        if ($lower > $upper) {
+        if ($this->compareTimeOnly($lower, $upper) > 0) {
             return 0;
         }
 
-        $diff = $lower->diff($upper);
-        $days = $diff->days + 1;
+        $lowerSeconds = (int) $lower->format('H') * 3600 + (int) $lower->format('i') * 60 + (int) $lower->format('s');
+        $upperSeconds = (int) $upper->format('H') * 3600 + (int) $upper->format('i') * 60 + (int) $upper->format('s');
+        $diffSeconds = $upperSeconds - $lowerSeconds;
 
-        $stepDays = $this->getStepDays();
-        $length = (int) ceil($days / $stepDays);
+        $stepSeconds = $this->getStepSeconds();
+        $length = (int) ceil($diffSeconds / $stepSeconds) + 1;
 
         return max($length, 0);
     }
@@ -239,7 +242,7 @@ readonly class DateRange implements RangeInterface
     public function union(RangeInterface $range): ?self
     {
         if (! $range instanceof self) {
-            throw new InvalidArgumentException('Range must be an instance of DateRange');
+            throw new InvalidArgumentException('Range must be an instance of TimeRange');
         }
 
         if (! $this->isSameStepUnit($range)) {
@@ -254,13 +257,13 @@ readonly class DateRange implements RangeInterface
         if ($thisLower === null || $rangeLower === null) {
             $lower = null;
         } else {
-            $lower = $this->minDate($thisLower, $rangeLower);
+            $lower = $this->minTime($thisLower, $rangeLower);
         }
 
         if ($thisUpper === null || $rangeUpper === null) {
             $upper = null;
         } else {
-            $upper = $this->maxDate($thisUpper, $rangeUpper);
+            $upper = $this->maxTime($thisUpper, $rangeUpper);
         }
 
         return new self($lower, $upper, '[', ']', $this->getStep());
@@ -270,7 +273,7 @@ readonly class DateRange implements RangeInterface
     public function intersection(RangeInterface $range): ?self
     {
         if (! $range instanceof self) {
-            throw new InvalidArgumentException('Range must be an instance of DateRange');
+            throw new InvalidArgumentException('Range must be an instance of TimeRange');
         }
 
         if (! $this->isSameStepUnit($range)) {
@@ -287,7 +290,7 @@ readonly class DateRange implements RangeInterface
         } elseif ($rangeLower === null) {
             $lower = $thisLower;
         } else {
-            $lower = $this->maxDate($thisLower, $rangeLower);
+            $lower = $this->maxTime($thisLower, $rangeLower);
         }
 
         if ($thisUpper === null) {
@@ -295,10 +298,10 @@ readonly class DateRange implements RangeInterface
         } elseif ($rangeUpper === null) {
             $upper = $thisUpper;
         } else {
-            $upper = $this->minDate($thisUpper, $rangeUpper);
+            $upper = $this->minTime($thisUpper, $rangeUpper);
         }
 
-        if ($lower !== null && $upper !== null && $lower > $upper) {
+        if ($lower !== null && $upper !== null && $this->compareTimeOnly($lower, $upper) > 0) {
             return null;
         }
 
@@ -322,14 +325,23 @@ readonly class DateRange implements RangeInterface
             throw new CantGenerateSeriesBecauseTheArrayIsTooLarge();
         }
 
-        if ($lower > $upper) {
+        if ($this->compareTimeOnly($lower, $upper) > 0) {
             return [];
+        }
+
+        $lowerSeconds = (int) $lower->format('H') * 3600 + (int) $lower->format('i') * 60 + (int) $lower->format('s');
+        $upperSeconds = (int) $upper->format('H') * 3600 + (int) $upper->format('i') * 60 + (int) $upper->format('s');
+        $diffSeconds = $upperSeconds - $lowerSeconds;
+        $stepSeconds = $this->getStepSeconds();
+
+        if ($diffSeconds > 0 && $diffSeconds < $stepSeconds) {
+            throw new InvalidStepToGenerateSeriesException();
         }
 
         $series = [];
         $current = clone $lower;
 
-        while ($current <= $upper) {
+        while ($this->compareTimeOnly($current, $upper) <= 0) {
             $series[] = clone $current;
             $current = $current->add($this->getStep());
         }
@@ -341,7 +353,7 @@ readonly class DateRange implements RangeInterface
     public function equals(RangeInterface $range): bool
     {
         if (! $range instanceof self) {
-            throw new InvalidArgumentException('Range must be an instance of DateRange');
+            throw new InvalidArgumentException('Range must be an instance of TimeRange');
         }
 
         $thisLower = $this->getLowerBoundValue();
@@ -355,7 +367,7 @@ readonly class DateRange implements RangeInterface
         ) {
             return false;
         }
-        if ($thisLower !== null && $rangeLower !== null && $thisLower != $rangeLower) {
+        if ($thisLower !== null && $rangeLower !== null && $this->compareTimeOnly($thisLower, $rangeLower) !== 0) {
             return false;
         }
 
@@ -365,7 +377,7 @@ readonly class DateRange implements RangeInterface
         ) {
             return false;
         }
-        if ($thisUpper !== null && $rangeUpper !== null && $thisUpper != $rangeUpper) {
+        if ($thisUpper !== null && $rangeUpper !== null && $this->compareTimeOnly($thisUpper, $rangeUpper) !== 0) {
             return false;
         }
 
@@ -373,8 +385,8 @@ readonly class DateRange implements RangeInterface
     }
 
     /**
-     * @param DateTimeImmutable $point
-     * @return array<DateRange>
+     * @param DateTimeInterface $point
+     * @return array<TimeRange>
      */
     #[Override]
     public function split(mixed $point): array
@@ -389,14 +401,14 @@ readonly class DateRange implements RangeInterface
 
         $leftRange = new self(
             $this->lower,
-            $point,
+            $point instanceof DateTimeImmutable ? $point : DateTimeImmutable::createFromMutable($point),
             $this->lowerBound,
             ')',
             $this->getStep()
         );
 
         $rightRange = new self(
-            $point,
+            $point instanceof DateTimeImmutable ? $point : DateTimeImmutable::createFromMutable($point),
             $this->upper,
             '[',
             $this->upperBound,
@@ -420,7 +432,7 @@ readonly class DateRange implements RangeInterface
 
     /**
      * @param DateInterval $offset
-     * @throws InvalidDateIntervalException
+     * @throws InvalidTimeIntervalException
      */
     #[Override]
     public function shift(mixed $offset): self
@@ -449,7 +461,7 @@ readonly class DateRange implements RangeInterface
     #[Override]
     public function scale(mixed $factor): self
     {
-        throw new InvalidArgumentException('Scale operation is not supported for DateRange');
+        throw new InvalidArgumentException('Scale operation is not supported for TimeRange');
     }
 
     #[Override]
@@ -459,51 +471,70 @@ readonly class DateRange implements RangeInterface
     }
 
     /**
-     * @throws InvalidDateIntervalException
+     * @throws InvalidTimeIntervalException
      */
     private function validateDateInterval(DateInterval $interval): void
     {
-        if ($interval->h !== 0 || $interval->i !== 0 || $interval->s !== 0 || $interval->f !== 0.0) {
-            throw new InvalidDateIntervalException();
+        if ($interval->y !== 0 || $interval->m !== 0 || $interval->d !== 0) {
+            throw new InvalidTimeIntervalException();
         }
     }
 
-    private function getStepDays(): int
+    private function getStepSeconds(): int
     {
-        $reference = new DateTimeImmutable();
-        $after = $reference->add($this->getStep());
-
-        return (int) $reference->diff($after)->days;
+        return $this->getStep()->h * 3600 + $this->getStep()->i * 60 + $this->getStep()->s;
     }
 
     private function isSameStepUnit(self $range): bool
     {
-        return $this->getStepDays() === $range->getStepDays();
+        return $this->getStepSeconds() === $range->getStepSeconds();
     }
 
-    private function minDate(?DateTimeImmutable $date1, ?DateTimeImmutable $date2): ?DateTimeImmutable
+    private function minTime(?DateTimeImmutable $time1, ?DateTimeImmutable $time2): ?DateTimeImmutable
     {
-        if ($date1 === null) {
-            return $date2;
+        if ($time1 === null) {
+            return $time2;
+        }
+        if ($time2 === null) {
+            return $time1;
         }
 
-        if ($date2 === null) {
-            return $date1;
-        }
-
-        return $date1 < $date2 ? $date1 : $date2;
+        return $this->compareTimeOnly($time1, $time2) < 0 ? $time1 : $time2;
     }
 
-    private function maxDate(?DateTimeImmutable $date1, ?DateTimeImmutable $date2): ?DateTimeImmutable
+    private function maxTime(?DateTimeImmutable $time1, ?DateTimeImmutable $time2): ?DateTimeImmutable
     {
-        if ($date1 === null) {
-            return $date1;
+        if ($time1 === null) {
+            return $time1;
+        }
+        if ($time2 === null) {
+            return $time2;
         }
 
-        if ($date2 === null) {
-            return $date2;
+        return $this->compareTimeOnly($time1, $time2) > 0 ? $time1 : $time2;
+    }
+
+    private function compareTimeOnly(?DateTimeInterface $time1, ?DateTimeInterface $time2): int
+    {
+        if ($time2 === null && $time1 !== null) {
+            return 1;
         }
 
-        return $date1 > $date2 ? $date1 : $date2;
+        if ($time1 === null && $time2 !== null) {
+            return -1;
+        }
+
+        if ($time1 === null && $time2 === null) {
+            return 0;
+        }
+
+        $time1Seconds = (int) $time1?->format('H') * 3600 +
+            (int) $time1?->format('i') * 60 +
+            (int) $time1?->format('s');
+        $time2Seconds = (int) $time2?->format('H') * 3600 +
+            (int) $time2?->format('i') * 60 +
+            (int) $time2?->format('s');
+
+        return $time1Seconds <=> $time2Seconds;
     }
 }
